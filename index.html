@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MONTECITORIO (v5.2) — Simulatore Politico</title>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>MONTECITORIO (v6.1.1.1) — Simulatore Politico</title>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -878,7 +881,7 @@
   <!-- SCHERMATA MENU PRINCIPALE (PUNTI 12, 13, 14) -->
   <section id="setupView">
     <div class="hero-box">
-      <h1>MONTECITORIO (v5.2)</h1>
+      <h1>MONTECITORIO (v6.1.1.1)</h1>
       <p class="hero-sub">Simulatore Politico</p>
     </div>
 
@@ -886,7 +889,7 @@
     <div class="setup-info-bar">
       <div class="glass" style="border-top-color:var(--gold);">
         <div class="sec-hdr">
-          <span>🔥 Novità dell'Aggiornamento (v5.2)</span>
+          <span>🔥 Novità dell'Aggiornamento (v6.1.1)</span>
           <span style="font-size:11px; color:var(--ok); font-weight:800;">20 Nuove Feature & Fix</span>
         </div>
         <div style="font-size:12.5px; color:var(--muted); line-height:1.5; max-height:210px; overflow-y:auto; padding-right:6px;">
@@ -2128,6 +2131,9 @@
     }
 
     async function loadOfficialISTATGeoJSON() {
+      // Usa direttamente i confini ISTAT incorporati in FALLBACK_REGIONS (100% offline/GitHub Pages compatibile senza sovrascrivere i centroidi)
+      game.geoRegions = FALLBACK_REGIONS;
+      return;
       try {
         const res = await fetch('https://raw.githubusercontent.com/openpolis/geojson-italy/master/geojson/limits_IT_regions.geojson');
         if (!res.ok) throw new Error('Offline');
@@ -2282,7 +2288,7 @@
 
     /* PUNTO 12: MANUALE E GUIDA INTERATTIVA PER I NUOVI GIOCATORI */
     function openTutorialModal() {
-      document.getElementById('mTag').textContent = "GUIDA UFFICIALE A MONTECITORIO v5.2";
+      document.getElementById('mTag').textContent = "GUIDA UFFICIALE A MONTECITORIO v6.1.1";
       document.getElementById('mTitle').textContent = "📖 Come Funziona la Simulazione Politica";
       document.getElementById('mBody').innerHTML = `
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:6px;">
@@ -3864,7 +3870,7 @@
 
         <div class="box" style="margin-bottom:10px;">
           <h4>🔄 Passaggio a un Altro Partito & Effetto sui Partiti Personali (Punti 2, 5, Bug Fix 2)</h4>
-          <p>Quando entri in un altro partito, entri come <strong>Capocorrente interno</strong> e devi vincere il Congresso per diventarne Segretario. <strong>Novità v5.2:</strong> se lasci un partito che dipendeva dalla tua leadership (es. <em>Renzi lascia Italia Viva per il PD</em>), potrai scegliere se <strong>sciogliere il tuo vecchio partito facendolo confluire</strong> nel nuovo (+seggi e +forza corrente) o lasciarlo trasformare/crollare! E se sei Presidente del Consiglio e cambi casacca, si aprirà immediatamente la <strong>Crisi di Governo al Quirinale</strong>!</p>
+          <p>Quando entri in un altro partito, entri come <strong>Capocorrente interno</strong> e devi vincere il Congresso per diventarne Segretario. <strong>Novità v6.1.1:</strong> se lasci un partito che dipendeva dalla tua leadership (es. <em>Renzi lascia Italia Viva per il PD</em>), potrai scegliere se <strong>sciogliere il tuo vecchio partito facendolo confluire</strong> nel nuovo (+seggi e +forza corrente) o lasciarlo trasformare/crollare! E se sei Presidente del Consiglio e cambi casacca, si aprirà immediatamente la <strong>Crisi di Governo al Quirinale</strong>!</p>
         </div>
 
         <div class="grid3">
@@ -6464,8 +6470,12 @@
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    // Avvio schermata di Setup
-    initSetupUI();
+    // Avvio schermata di Setup compatibile sia con file locale sia con GitHub Pages / HTMLPreview
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initSetupUI);
+    } else {
+      initSetupUI();
+    }
   </script>
 </body>
 </html>
