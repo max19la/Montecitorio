@@ -6,7 +6,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <title>MONTECITORIO (v6.2) — Simulatore Politico</title>
+  <title>MONTECITORIO (v6.2.1) — Simulatore Politico</title>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -837,39 +837,70 @@
       background: rgba(15, 23, 42, 0.5);
     }
 
-    /* PUNTO 14: PULSANTIERA FLOTTANTE DEL TEMPO SEMPRE VISIBILE ANCHE IN FONDO ALLA PAGINA */
+    /* PUNTO 14 (v6.2.1): PULSANTIERA FLOTTANTE DEL TEMPO SEMPRE VISIBILE, ELEGANTE E SINCRONIZZATA IN TEMPO REALE */
     #floatingTimeDock {
       position: fixed;
-      bottom: 16px;
-      right: 18px;
+      bottom: 18px;
+      right: 20px;
       z-index: 4500;
       display: none;
       align-items: center;
-      gap: 8px;
-      background: rgba(8, 13, 24, 0.96);
-      border: 1.5px solid var(--gold);
-      border-radius: 14px;
-      padding: 8px 13px;
-      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.8), 0 0 18px rgba(226, 185, 59, 0.22);
-      backdrop-filter: blur(14px);
+      gap: 10px;
+      background: linear-gradient(135deg, rgba(11, 18, 32, 0.97) 0%, rgba(19, 29, 49, 0.97) 100%);
+      border: 1.5px solid rgba(226, 185, 59, 0.65);
+      border-top: 3px solid var(--party-color);
+      border-radius: 16px;
+      padding: 9px 14px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.85), 0 0 22px rgba(var(--party-rgb), 0.28);
+      backdrop-filter: blur(16px);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    #floatingTimeDock:hover {
+      box-shadow: 0 18px 44px rgba(0, 0, 0, 0.92), 0 0 28px rgba(226, 185, 59, 0.32);
     }
     #floatingTimeDock .ft-info {
       display: flex;
       flex-direction: column;
-      line-height: 1.25;
-      padding-right: 8px;
-      border-right: 1px solid var(--bd);
+      gap: 2px;
+      line-height: 1.2;
+      padding-right: 10px;
+      border-right: 1px solid rgba(255, 255, 255, 0.14);
+    }
+    #floatingTimeDock .ft-date-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    #floatingTimeDock .ft-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+      flex-shrink: 0;
     }
     #floatingTimeDock .ft-date {
-      font-size: 12px;
+      font-size: 12.5px;
       font-weight: 800;
       color: var(--gold-lt);
       white-space: nowrap;
+      letter-spacing: 0.01em;
     }
     #floatingTimeDock .ft-res {
+      display: flex;
+      align-items: center;
+      gap: 6px;
       font-size: 11px;
+      font-weight: 700;
       color: var(--muted);
       white-space: nowrap;
+    }
+    #floatingTimeDock .ft-pill {
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 1px 6px;
+      border-radius: 6px;
+      font-weight: 800;
     }
     #floatingTimeDock .ft-btns {
       display: flex;
@@ -877,21 +908,35 @@
       align-items: center;
     }
     #floatingTimeDock .ft-btn {
-      background: linear-gradient(135deg, #1e293b, #0f172a);
       color: #fff;
-      border: 1px solid rgba(226, 185, 59, 0.45);
-      border-radius: 8px;
-      padding: 6px 10px;
+      border-radius: 9px;
+      padding: 7px 11px;
       font-size: 12px;
       font-weight: 800;
       cursor: pointer;
       transition: all 0.15s ease;
       white-space: nowrap;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    #floatingTimeDock .ft-btn.ft-b1 {
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    }
+    #floatingTimeDock .ft-btn.ft-b7 {
+      background: linear-gradient(135deg, #059669, #047857);
+    }
+    #floatingTimeDock .ft-btn.ft-b30 {
+      background: linear-gradient(135deg, #7c3aed, #6d28d9);
+    }
+    #floatingTimeDock .ft-btn.ft-top {
+      background: var(--bg-2);
+      color: var(--gold-lt);
+      border-color: var(--gold-bd);
+      padding: 7px 9px;
     }
     #floatingTimeDock .ft-btn:hover {
-      background: var(--gold);
-      color: #050811;
       transform: translateY(-2px);
+      filter: brightness(1.15);
+      border-color: var(--gold-lt);
     }
 
     /* PUNTO 4: BANNER CAMPAGNA REFERENDARIA DI 30 GIORNI */
@@ -1009,23 +1054,23 @@
   <!-- SCHERMATA MENU PRINCIPALE (PUNTI 12, 13, 14) -->
   <section id="setupView">
     <div class="hero-box">
-      <h1>MONTECITORIO (v6.2)</h1>
+      <h1>MONTECITORIO (v6.2.1)</h1>
       <p class="hero-sub">Simulatore Politico</p>
     </div>
 
-    <!-- SEZIONE NOVITÀ DELL'AGGIORNAMENTO (v6.2) + GUIDA NUOVI GIOCATORI -->
+    <!-- SEZIONE NOVITÀ DELL'AGGIORNAMENTO (v6.2.1) + GUIDA NUOVI GIOCATORI -->
     <div class="setup-info-bar">
       <div class="glass" style="border-top-color:var(--gold);">
         <div class="sec-hdr">
-          <span>🔥 Novità dell'Aggiornamento (v6.2)</span>
-          <span style="font-size:11px; color:var(--ok); font-weight:800;">17 Fix & Miglioramenti Sistemici</span>
+          <span>🔥 Novità dell'Aggiornamento (v6.2.1)</span>
+          <span style="font-size:11px; color:var(--ok); font-weight:800;">Hotfix Selettori, Cronometro & Coerenza DDL</span>
         </div>
         <div style="font-size:12.5px; color:var(--muted); line-height:1.5; max-height:210px; overflow-y:auto; padding-right:6px;">
-          • <strong>15 Ministeri Completi (Inclusi Cultura, MUR e Turismo) & Unicità delle Cariche</strong>: ogni politico può ricoprire <strong>una sola carica</strong> nello Stato (niente più doppi incarichi tra Ministeri, Presidenze di Camera/Senato, Palazzo Chigi o Quirinale). Se sei un partito minore della coalizione vincitrice, il nuovo Premier può nominarti <strong>Ministro</strong>!<br>
-          • <strong>Scheda Interattiva del Partito Ovunque & Gestione Completa Coalizioni</strong>: clicca sull'icona o sul nome di qualsiasi partito (nella barra sondaggi, nell'emiciclo o nelle schede) per aprire la sua <strong>Struttura Interna, Correnti, Confronto dei 14 Dossier e Azioni Diplomatiche</strong>. Corretto il calcolo della compatibilità globale e ripristinata la gestione completa del Polo.<br>
-          • <strong>Elezione del Presidente della Repubblica Realistica + Candidatura Personale</strong>: eliminato il loop infinito da Indipendente, scrutini realistici (fumata bianca entro 4–6 scrutini) e possibilità di <strong>essere eletto tu stesso Presidente della Repubblica al Quirinale</strong>!<br>
-          • <strong>Campagna Referendaria di 30 Giorni & Stop Spam Azioni</strong>: indire un referendum ora avvia una vera <strong>campagna referendaria di 30 giorni</strong> (con vincolo di 1 anno prima di riproporlo); ogni azione può essere svolta al massimo <strong>1 volta per turno</strong> e la mappa regionale è stata ribilanciata.<br>
-          • <strong>Menu Selettore Custom del Motore di Gioco & Pulsantiera Tempo Sempre Visibile</strong>: sostituiti i menu a tendina nativi macOS con il selettore integrato di Montecitorio con ricerca, e aggiunta la <strong>pulsantiera del tempo flottante in basso a destra</strong> sempre accessibile!
+          • <strong>Selettore Politici e Ministri In-Engine Corretto e Arricchito</strong>: riparato e potenziato il menu di selezione dei 48 Politici Reali nel Setup, dei 15 Ministri e dei Presidenti di Camera e Senato, con schede visive complete di badge partito, età, competenza e ricerca istantanea.<br>
+          • <strong>Coerenza Programmatica Obbligatoria sui DDL in Aula</strong>: non puoi più far votare ai tuoi parlamentari un DDL contrario al Programma vigente del tuo partito (es. FdI sul matrimonio egualitario o cannabis). Ogni DDL mostra il badge di allineamento programmatico col tuo partito e i parlamentari votano rigorosamente secondo il programma sul dossier.<br>
+          • <strong>Stop Cambio Ripetuto dei Temi Caldi (Moratoria Legislativa)</strong>: introdotta la moratoria parlamentare di 180 giorni dopo la modifica di una legge (oltre al vincolo di 365 giorni sui referendum) per impedire ribaltamenti continui della stessa norma.<br>
+          • <strong>Pulsantiera Flottante del Tempo Ridisegnata e Sincronizzata</strong>: grafica istituzionale rinnovata e aggiornamento in tempo reale di data, giorno, Capitale Politico (⚡) e Tesoreria ad ogni turno.<br>
+          • <strong>15 Ministeri, Unicità Cariche, Scheda Partito Universale & Candidatura al Quirinale</strong>: tutte le novità sistemiche della serie 6.2 pienamente operative.
         </div>
       </div>
 
@@ -1171,7 +1216,7 @@
     </div>
 
     <div id="campRibbon">🗳️ CAMPAGNA ELETTORALE IN CORSO — MANCANO <span id="campDays">45</span> GIORNI ALLE URNE!</div>
-    <div id="refRibbon">🗳️ CAMPAGNA REFERENDARIA IN CORSO: <span id="refRibbonTitle">Referendum Popolare</span> — MANCANO <span id="refRibbonDays">30</span> GIORNI AL VOTO!</div>
+    <div id="refRibbon">🗳️ CAMPAGNA REFERENDARIA IN CORSO: <span id="refRibbonTitle">Referendum Popolare</span> — MANCANO <span id="refRibbonDays">30</span> GIORNI AL VOTO! (SÌ stimato: <span id="refRibbonYes">50%</span>)</div>
     <div id="regimeRibbon">🦅 REGIME AUTORITARIO IN VIGORE — STATO D'ECCEZIONE E PIENI POTERI (Rischio Rivolta: <span id="regRevoltTxt">15%</span>)</div>
     <div class="ticker"><span class="t-tag">DIRETTA ANSA</span><div id="tickerTxt">3 Novembre 2026: Riaprono i lavori a Montecitorio e Palazzo Madama.</div></div>
 
@@ -1235,16 +1280,24 @@
     </div>
   </section>
 
-  <!-- PUNTO 14: PULSANTIERA FLOTTANTE DEL TEMPO SEMPRE VISIBILE E ACCESSIBILE -->
+  <!-- PUNTO 14 (v6.2.1): PULSANTIERA FLOTTANTE DEL TEMPO SEMPRE VISIBILE, ISTITUZIONALE E SINCRONIZZATA -->
   <div id="floatingTimeDock">
     <div class="ft-info">
-      <span class="ft-date" id="ftDateTxt">📅 Mar 03 Nov 2026</span>
-      <span class="ft-res" id="ftResTxt">⚡ 100 • € 450k</span>
+      <div class="ft-date-row">
+        <span class="ft-dot"></span>
+        <span class="ft-date" id="ftDateTxt">📅 Mar 03 Nov 2026</span>
+      </div>
+      <div class="ft-res">
+        <span class="ft-pill" id="ftTurnTxt" style="color:#93c5fd;">Giorno 1</span>
+        <span class="ft-pill" id="ftApTxt" style="color:#60a5fa;">100 ⚡</span>
+        <span class="ft-pill" id="ftFundsTxt" style="color:#34d399;">€ 450k</span>
+      </div>
     </div>
     <div class="ft-btns">
-      <button class="ft-btn" onclick="nextTurns(1)" title="Avanza di 1 Giorno">▶️ +1G</button>
-      <button class="ft-btn" onclick="nextTurns(7)" title="Avanza di 7 Giorni (1 Settimana)">⏩ +7G</button>
-      <button class="ft-btn" onclick="nextTurns(30)" title="Avanza di 30 Giorni (1 Mese)">⏭️ +30G</button>
+      <button class="ft-btn ft-b1" onclick="nextTurns(1)" title="Avanza di 1 Giorno">▶️ +1G</button>
+      <button class="ft-btn ft-b7" onclick="nextTurns(7)" title="Avanza di 7 Giorni (1 Settimana)">⏩ +7G</button>
+      <button class="ft-btn ft-b30" onclick="nextTurns(30)" title="Avanza di 30 Giorni (1 Mese)">⏭️ +30G</button>
+      <button class="ft-btn ft-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Torna in cima alla pagina">↑</button>
     </div>
   </div>
 
@@ -1259,7 +1312,7 @@
   </div>
 
   <!-- PUNTO 6: MODAL UNIVERSALE ISPETTORE & STRUTTURA INTERNA DEL PARTITO (CLICCABILE DA QUALSIASI ICONA) -->
-  <div class="modal-bg" id="partyInspectorModalBg" style="z-index:12000;">
+  <div class="modal-bg" id="partyInspectorModalBg" style="z-index:12000;" onclick="if(event.target.id==='partyInspectorModalBg')closePartyInspectorModal()">
     <div class="modal-w" style="max-width:780px; width:95%;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
         <span class="m-tag" id="piTag" style="margin-bottom:0;">SCHEDA E STRUTTURA INTERNA DEL PARTITO</span>
@@ -1269,16 +1322,16 @@
     </div>
   </div>
 
-  <!-- PUNTO 13: MODAL SELETTORE CUSTOM INTEGRATO NEL MOTORE DI GIOCO (SOSTITUISCE IL MENU A TENDINA NATIVO MACOS) -->
-  <div class="modal-bg" id="gameSelectModalBg" style="z-index:16000;">
-    <div class="modal-w" style="max-width:600px; width:94%;">
+  <!-- PUNTO 13 (v6.2.1): MODAL SELETTORE CUSTOM INTEGRATO NEL MOTORE DI GIOCO (SOSTITUISCE IL MENU A TENDINA NATIVO MACOS) -->
+  <div class="modal-bg" id="gameSelectModalBg" style="z-index:20000;" onclick="if(event.target.id==='gameSelectModalBg')closeGameSelectModal()">
+    <div class="modal-w" style="max-width:640px; width:94%;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-        <span class="m-tag" id="gsTag" style="margin-bottom:0;">SELETTORE DI MONTECITORIO</span>
+        <span class="m-tag" id="gsTag" style="margin-bottom:0;">SELETTORE ISTITUZIONALE DI MONTECITORIO</span>
         <button class="btn" style="padding:4px 10px; font-size:11.5px;" onclick="closeGameSelectModal()">✕ Annulla</button>
       </div>
       <h2 id="gsTitle" style="margin-bottom:8px; font-size:17px; color:var(--gold-lt);">Seleziona un'opzione</h2>
       <div id="gsSearchWrap" style="margin-bottom:10px;">
-        <input type="text" id="gsSearchInput" placeholder="🔍 Cerca per nome, partito o ruolo..." oninput="filterGameSelectOptions(this.value)" style="width:100%; padding:9px 12px; font-size:13px;" />
+        <input type="text" id="gsSearchInput" placeholder="🔍 Cerca per nome, partito, ruolo o competenza..." oninput="filterGameSelectOptions(this.value)" style="width:100%; padding:9px 12px; font-size:13px;" />
       </div>
       <div id="gsOptionsList" style="display:flex; flex-direction:column; gap:6px; max-height:58vh; overflow-y:auto; padding-right:4px;"></div>
     </div>
@@ -2221,8 +2274,13 @@
       inNATO:true,
       defenseSpendGDP:1.6,
       foreignRels:{ usa:74, eu_com:72, ukraine:75, russia:18, china:44, med:68 },
-      // LEGGI VIGENTI SUI 16 TEMI CALDI (PUNTO 9)
+      // LEGGI VIGENTI SUI 16 TEMI CALDI (PUNTO 9 + MORATORIA LEGISLATIVA v6.2.1)
       lawStates:{},
+      lawCooldowns:{},
+      referendumCooldowns:{},
+      activeReferendum:null,
+      regCooldowns:{},
+      turnActionsUsed:[],
       coalitions:{
         cdx:{ id:'cdx', name:'Centrodestra' },
         csx:{ id:'csx', name:'Centrosinistra' },
@@ -2497,9 +2555,25 @@
       game.geoRegions = FALLBACK_REGIONS;
     }
 
+    function selectSetupPartyCard(partyId) {
+      selectedStartPartyId = partyId;
+      document.body.classList.remove('theme-ind');
+      if (charMode === 'preset') {
+        const matchPol = PRESET_POLITICIANS.find(x => x.partyId === partyId && x.role === 'secretary')
+          || PRESET_POLITICIANS.find(x => x.partyId === partyId);
+        const selEl = document.getElementById('selRealPolitician');
+        if (matchPol && selEl) {
+          selEl.value = matchPol.id;
+          applyPresetPreview();
+          return;
+        }
+      }
+      renderSetupParties();
+    }
+
     function renderSetupParties() {
       document.getElementById('setupParties').innerHTML = INITIAL_PARTIES.map(p => `
-        <div class="p-card ${p.id===selectedStartPartyId?'sel':''}" onclick="selectedStartPartyId='${p.id}';document.body.classList.remove('theme-ind');renderSetupParties()">
+        <div class="p-card ${p.id===selectedStartPartyId?'sel':''}" onclick="selectSetupPartyCard('${p.id}')">
           <div style="width:36px; height:36px; flex-shrink:0;">${getPartySVG(p.id,p.short,p.color)}</div>
           <div>
             <div style="font-weight:800; font-size:12px;">${p.name}</div>
@@ -2525,6 +2599,7 @@
       game.dissolvedParties = [];
       game.turnActionsUsed = [];
       game.activeReferendum = null;
+      game.lawCooldowns = {};
       game.referendumCooldowns = {};
       game.regCooldowns = {};
       game.president.isPlayer = false;
@@ -3309,6 +3384,7 @@
         const law = HOT_LAWS.find(x => x.id === ref.lawId);
         if (won && law) {
           game.lawStates[law.id] = ref.targetIdx;
+          game.lawCooldowns[law.id] = game.turn + 365;
           const opt = law.options.find(o => o.idx === ref.targetIdx) || law.options[0];
           if (opt && opt.eff) opt.eff(game);
           if (opt && opt.targetStance !== undefined && p.id !== 'ind') {
@@ -5030,14 +5106,23 @@
             const isGreen = curOpt.status.includes('🟢');
             const isRed = curOpt.status.includes('🔴');
             const stColor = isGreen ? '#34d399' : (isRed ? '#f87171' : '#fde047');
-            const cdLeft = Math.max(0, (game.referendumCooldowns[law.id] || 0) - game.turn);
+            const refCdLeft = Math.max(0, (game.referendumCooldowns[law.id] || 0) - game.turn);
+            const lawCdLeft = Math.max(0, (game.lawCooldowns[law.id] || 0) - game.turn);
+            const dObj = DOSSIERS.find(d => d.key === law.dossier);
+            const dTitle = dObj ? dObj.title : law.dossier.toUpperCase();
+            const isInd = (game.partyRole === 'independent' || p.id === 'ind');
+            const myPartyStance = isInd ? (game.personalStances[law.dossier] ?? 2) : (p.stances[law.dossier] ?? Math.round(getPartyIdeoScore(p)));
 
             return `
               <div class="law-card">
                 <div class="law-card-head">
                   <div>
                     <div style="font-size:13.5px; font-weight:800; color:#fff;">${law.title}</div>
-                    <div style="font-size:10.5px; color:var(--muted);">Dossier collegato: <strong>${law.dossier.toUpperCase()}</strong> ${cdLeft > 0 ? `• <span style="color:#f87171;">🔒 Quesito referendario bloccato per ${cdLeft}g</span>` : ''}</div>
+                    <div style="font-size:10.5px; color:var(--muted);">
+                      Dossier: <strong>${dTitle}</strong> • Linea ${isInd ? 'Personale' : `Programma ${p.short}`}: <strong style="color:var(--gold-lt);">${STANCE_LABELS[myPartyStance].short}</strong>
+                      ${lawCdLeft > 0 ? ` • <span style="color:#f59e0b; font-weight:800;">⏳ Moratoria Aula: ${lawCdLeft}g</span>` : ''}
+                      ${refCdLeft > 0 ? ` • <span style="color:#f87171; font-weight:800;">🔒 Vincolo Ref.: ${refCdLeft}g</span>` : ''}
+                    </div>
                   </div>
                   <span class="law-status-pill" style="background:rgba(255,255,255,0.06); color:${stColor}; border:1px solid ${stColor}66;">
                     ${curOpt.status}
@@ -5047,14 +5132,23 @@
                   <strong>Normativa vigente in Italia:</strong> ${curOpt.label}
                 </div>
                 <div style="font-size:11px; color:var(--gold-lt); font-weight:700; margin-top:4px;">
-                  ${game.isDictatorship ? 'Imponi nuova legge per Decreto del Regime:' : 'Proponi Riforma Legislativa o Referendum (30g campagna) verso:'}
+                  ${game.isDictatorship ? 'Imponi nuova legge per Decreto del Regime:' : 'Proponi Riforma Legislativa (in linea col Programma) o Referendum (30g campagna):'}
                 </div>
                 <div style="display:flex; flex-direction:column; gap:6px;">
-                  ${law.options.filter(o => o.idx !== curIdx).map(opt => `
-                    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; background:rgba(255,255,255,0.03); border:1px solid var(--bd); border-radius:7px; padding:7px 9px; flex-wrap:wrap;">
+                  ${law.options.filter(o => o.idx !== curIdx).map(opt => {
+                    const targetStance = opt.targetStance ?? 2;
+                    const myDist = Math.abs(myPartyStance - targetStance);
+                    const alignBadge = myDist === 0
+                      ? `<div style="font-size:10.5px; color:#34d399; font-weight:800; margin-top:2px;">✅ In Piena Linea col Programma ${isInd ? 'Personale' : `di ${p.short}`} (${STANCE_LABELS[targetStance].short})</div>`
+                      : (myDist === 1
+                        ? `<div style="font-size:10.5px; color:#fde047; font-weight:800; margin-top:2px;">⚖️ Compatibile col Programma ${isInd ? 'Personale' : `di ${p.short}`} (${STANCE_LABELS[targetStance].short})</div>`
+                        : `<div style="font-size:10.5px; color:#f87171; font-weight:800; margin-top:2px;">⛔ Contrario al Programma vigente ${isInd ? 'Personale' : `di ${p.short}`} (Richiede ${STANCE_LABELS[targetStance].short})</div>`);
+                    return `
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; background:rgba(255,255,255,0.03); border:1px solid ${myDist >= 2 && !isInd ? 'rgba(239,68,68,0.35)' : 'var(--bd)'}; border-radius:7px; padding:7px 9px; flex-wrap:wrap;">
                       <div style="flex:1; min-width:170px;">
                         <div style="font-size:11.5px; font-weight:800; color:var(--gold-lt);">${opt.status}</div>
                         <div style="font-size:11px; color:var(--muted);">${opt.label}</div>
+                        ${alignBadge}
                       </div>
                       <div style="display:flex; gap:5px; flex-wrap:wrap;">
                         ${game.isImprisoned ? `
@@ -5064,16 +5158,17 @@
                             🦅 Imponi per Decreto (15 ⚡)
                           </button>
                         ` : `
-                          <button class="btn" style="padding:5px 8px; font-size:10.5px;" onclick="proposeHotLawParliament('${law.id}', ${opt.idx})">
-                            🏛️ DDL in Aula (25 ⚡)
+                          <button class="btn" style="padding:5px 8px; font-size:10.5px; ${lawCdLeft > 0 ? 'opacity:0.5;' : (!isInd && myDist >= 2 ? 'border-color:#ef4444; color:#fca5a5;' : '')}" onclick="proposeHotLawParliament('${law.id}', ${opt.idx})">
+                            🏛️ ${lawCdLeft > 0 ? `Moratoria (${lawCdLeft}g)` : (!isInd && myDist >= 2 ? `⛔ Contrario a ${p.short}` : 'DDL in Aula (25 ⚡)')}
                           </button>
-                          <button class="btn btn-w" style="padding:5px 8px; font-size:10.5px; ${cdLeft>0||game.activeReferendum?'opacity:0.55;':''}" onclick="launchHotLawReferendum('${law.id}', ${opt.idx})">
-                            🗳️ ${cdLeft > 0 ? `Bloccato (${cdLeft}g)` : 'Referendum 30g (€ 45k • 30 ⚡)'}
+                          <button class="btn btn-w" style="padding:5px 8px; font-size:10.5px; ${refCdLeft>0||lawCdLeft>0||game.activeReferendum?'opacity:0.55;':''}" onclick="launchHotLawReferendum('${law.id}', ${opt.idx})">
+                            🗳️ ${refCdLeft > 0 ? `Bloccato (${refCdLeft}g)` : (lawCdLeft > 0 ? `Moratoria (${lawCdLeft}g)` : 'Referendum 30g (€ 45k • 30 ⚡)')}
                           </button>
                         `)}
                       </div>
                     </div>
-                  `).join('')}
+                  `;
+                  }).join('')}
                 </div>
               </div>
             `;
@@ -5084,12 +5179,19 @@
 
     function campaignReferendumAction(side) {
       if (!game.activeReferendum) return;
+      const used = game.activeReferendum.ralliesUsed || 0;
+      const maxR = game.activeReferendum.maxRallies || 3;
+      if (used >= maxR) {
+        alert(`🛑 Hai già tenuto il massimo di ${maxR} grandi mobilitazioni nazionali in questa campagna referendaria! Ora attendi il verdetto delle urne.`);
+        return;
+      }
       if (game.ap < 18) { alert("Servono 18 ⚡ per organizzare una mobilitazione referendaria nazionale!"); return; }
       if (!useTurnAction('ref_campaign_act', 'Mobilitazione Campagna Referendaria')) return;
       game.ap -= 18;
-      const delta = side === 'yes' ? 4.5 : -4.5;
-      game.activeReferendum.yesPct = Math.max(10, Math.min(90, +(game.activeReferendum.yesPct + delta).toFixed(1)));
-      addFeed(`📣 <strong>CAMPAGNA REFERENDARIA (${game.activeReferendum.title}):</strong> Comizio nazionale di ${game.leader.name} per il <strong>${side === 'yes' ? 'SÌ' : 'NO'}</strong>! I sondaggi sul SÌ si portano al <strong>${game.activeReferendum.yesPct.toFixed(1)}%</strong>.`);
+      game.activeReferendum.ralliesUsed = used + 1;
+      const delta = side === 'yes' ? 3.5 : -3.5;
+      game.activeReferendum.yesPct = Math.max(10, Math.min(88, +(game.activeReferendum.yesPct + delta).toFixed(1)));
+      addFeed(`📣 <strong>CAMPAGNA REFERENDARIA (${game.activeReferendum.title} — Comizio ${game.activeReferendum.ralliesUsed}/${maxR}):</strong> Mobilitazione di ${game.leader.name} per il <strong>${side === 'yes' ? 'SÌ' : 'NO'}</strong>! I sondaggi sul SÌ si portano al <strong>${game.activeReferendum.yesPct.toFixed(1)}%</strong>.`);
       updateAllUI();
     }
 
@@ -5103,6 +5205,7 @@
       const opt = law.options.find(o => o.idx === targetIdx);
       if (!opt) return;
       game.lawStates[law.id] = targetIdx;
+      game.lawCooldowns[law.id] = game.turn + 180;
       if (opt.eff) opt.eff(game);
       game.revoltRisk = Math.min(100, game.revoltRisk + 4);
       recalcPolls(true);
@@ -5110,17 +5213,61 @@
       updateAllUI();
     }
 
-    function proposeHotLawParliament(lawId, targetIdx) {
+    /* PUNTI 3 & 4 (v6.2.1): COERENZA PROGRAMMATICA OBBLIGATORIA SUI DDL E MORATORIA LEGISLATIVA DI 180 GIORNI */
+    function proposeHotLawParliament(lawId, targetIdx, forceAgainstParty = false) {
       if (game.isImprisoned) { alert("Sei detenuto a Rebibbia!"); return; }
       const law = HOT_LAWS.find(l => l.id === lawId);
       if (!law) return;
-      if (game.ap < 25) { alert("Servono 25 ⚡ di Capitale Politico per calendarizzare e mettere ai voti il DDL a Montecitorio!"); return; }
-      if (!useTurnAction('ddl_' + lawId, `DDL su ${law.title}`)) return;
-      game.ap -= 25;
+
+      const lawCdLeft = Math.max(0, (game.lawCooldowns[lawId] || 0) - game.turn);
+      if (lawCdLeft > 0) {
+        alert(`⏳ Moratoria Legislativa in vigore su "${law.title}"!\nQuesta legge è già stata votata o modificata di recente: per regolamento parlamentare devono trascorrere ancora ${lawCdLeft} giorni prima di poter calendarizzare un nuovo DDL sullo stesso tema.`);
+        return;
+      }
 
       const opt = law.options.find(o => o.idx === targetIdx);
       if (!opt) return;
       const targetStance = opt.targetStance ?? 2;
+
+      const p = getP();
+      const isInd = (game.partyRole === 'independent' || p.id === 'ind');
+      const dObj = DOSSIERS.find(d => d.key === law.dossier);
+      const dTitle = dObj ? dObj.title : law.dossier.toUpperCase();
+      const myPartyStance = isInd ? (game.personalStances[law.dossier] ?? 2) : (p.stances[law.dossier] ?? Math.round(getPartyIdeoScore(p)));
+      const myDist = Math.abs(myPartyStance - targetStance);
+
+      // Punto 4 (v6.2.1): Il DDL deve essere in linea con il Programma vigente del partito!
+      if (!isInd && myDist >= 2 && !forceAgainstParty) {
+        openModal(
+          `⛔ Veto dei Capigruppo di ${p.short}: DDL Contrario al Programma Vigente!`,
+          `<div style="font-size:13px; color:var(--txt); line-height:1.55;">
+            I Capigruppo parlamentari di <strong>${p.name}</strong> alla Camera e al Senato rifiutano di sottoscrivere e depositare il DDL <strong>«${opt.status}»</strong> su <em>${law.title}</em> perché è in <strong>aperto contrasto con il Programma vigente del tuo partito</strong>!<br><br>
+            <div class="box" style="background:var(--bg-2); border-color:#ef4444; margin-bottom:10px;">
+              • <strong>Dossier programmatico:</strong> ${dTitle}<br>
+              • <strong>Posizione attuale nel Programma di ${p.short}:</strong> <span style="color:#fde047; font-weight:800;">${STANCE_LABELS[myPartyStance].tag}</span> ${dObj ? `— <em>"${dObj.opts[myPartyStance]}"</em>` : ''}<br>
+              • <strong>Posizione richiesta dal DDL proposto:</strong> <span style="color:#f87171; font-weight:800;">${STANCE_LABELS[targetStance].tag}</span> — <em>"${opt.label}"</em>
+            </div>
+            <strong>Come funziona la disciplina programmatica in Parlamento?</strong><br>
+            1. <strong>Modifica prima il Programma (Consigliato):</strong> vai nella scheda <strong>📜 Programma (14 Dossier)</strong> e sposta la posizione ufficiale di <strong>${p.short}</strong> sul dossier <em>${dTitle}</em> verso una linea compatibile con questo DDL (distanza &le; 1), assumendotene gli effetti su correnti ed elettorato.<br>
+            2. <strong>Forzatura in Aula contro il partito:</strong> se forzi comunque la calendarizzazione oggi <em>senza</em> aver cambiato il Programma di ${p.short}, <strong>i parlamentari del tuo stesso partito voteranno CONTRO il DDL</strong> in Aula seguendo il programma ufficiale e subirai <strong>-12% Fiducia della Base</strong>!
+          </div>`,
+          [
+            { label: `🔙 Ritira il DDL (0 ⚡ spesi)`, fn: () => { closeModal(); } },
+            { label: `📜 Vai a 'Programma (14 Dossier)' per cambiare la linea di ${p.short}`, fn: () => { closeModal(); showTab('tProg', document.querySelectorAll('.nav-item')[2]); } },
+            { label: `⚠️ Forza comunque il voto in Aula contro il Programma di ${p.short} (25 ⚡ • I tuoi deputati voteranno NO!)`, fn: () => { closeModal(); proposeHotLawParliament(lawId, targetIdx, true); } }
+          ]
+        );
+        return;
+      }
+
+      if (game.ap < 25) { alert("Servono 25 ⚡ di Capitale Politico per calendarizzare e mettere ai voti il DDL a Montecitorio!"); return; }
+      if (!useTurnAction('ddl_' + lawId, `DDL su ${law.title}`)) return;
+      game.ap -= 25;
+
+      if (!isInd && myDist >= 2 && forceAgainstParty) {
+        p.leaderTrust = Math.max(10, (p.leaderTrust ?? 78) - 12);
+        p.cohesion = Math.max(15, (p.cohesion ?? 80) - 8);
+      }
 
       let yesVotes = 0;
       let noVotes = 0;
@@ -5130,20 +5277,48 @@
         if (!pt.seats) return;
         const ptStance = pt.stances[law.dossier] ?? Math.round(getPartyIdeoScore(pt));
         const dist = Math.abs(ptStance - targetStance);
-        let yesShare = 0.05;
-        if (pt.id === game.playerPartyId && game.partyRole !== 'independent') {
-          yesShare = 0.94;
-        } else if (dist === 0) {
-          yesShare = 0.90;
-        } else if (dist === 1) {
-          yesShare = 0.65;
-        } else if (dist === 2) {
-          yesShare = 0.24;
+        const sameCoal = !isInd && ((p.inGov && pt.inGov) || (p.coalId !== 'none' && pt.coalId === p.coalId));
+        // La disciplina di coalizione scatta solo se il DDL proposto è coerente col programma del partito proponente (myDist <= 1)!
+        const validCoalBill = sameCoal && myDist <= 1;
+        let yesShare = 0.02;
+
+        if (pt.id === game.playerPartyId && !isInd) {
+          // I deputati del tuo partito votano secondo il PROGRAMMA VIGENTE del partito (ptStance) e la coesione rispetto allo Statuto!
+          const baseSt = (pt.baseStances && pt.baseStances[law.dossier] !== undefined) ? pt.baseStances[law.dossier] : ptStance;
+          const statutoDrift = Math.abs(baseSt - targetStance);
+          const rebelDrag = statutoDrift >= 3 ? Math.max(0, (90 - (pt.cohesion || 80)) * 0.006 + 0.16) : (statutoDrift === 2 ? 0.06 : 0);
+          if (dist === 0) {
+            yesShare = Math.max(0.60, Math.min(0.98, 0.82 + (pt.cohesion || 80) * 0.0020 - rebelDrag));
+          } else if (dist === 1) {
+            yesShare = Math.max(0.55, Math.min(0.95, 0.78 + (pt.cohesion || 80) * 0.0020 - rebelDrag));
+          } else if (dist === 2) {
+            yesShare = 0.04;
+          } else {
+            yesShare = 0.01;
+          }
         } else {
-          yesShare = 0.04;
+          const satFactor = Math.max(0.75, Math.min(1.08, (game.allySatisfaction[pt.id] ?? 78) / 76));
+          if (dist === 0) {
+            yesShare = validCoalBill ? 0.96 : 0.74;
+          } else if (dist === 1) {
+            yesShare = validCoalBill ? Math.min(0.93, 0.88 * satFactor) : 0.16;
+          } else if (dist === 2) {
+            // Un alleato moderato di governo (es. FI su un DDL di FdI/Lega) vota in parte per disciplina di coalizione, ma con franchi tiratori
+            yesShare = validCoalBill ? Math.min(0.74, 0.66 * satFactor) : 0.03;
+          } else {
+            yesShare = 0.01;
+          }
         }
-        if (game.chamberSpeaker?.partyId === game.playerPartyId) yesShare = Math.min(0.98, yesShare + 0.08);
-        if (game.senateSpeaker?.partyId === game.playerPartyId) yesShare = Math.min(0.98, yesShare + 0.05);
+
+        // Il bonus dei Presidenti di Camera/Senato aiuta solo nei gruppi parlamentari ideologicamente compatibili (dist <= 1)
+        if (dist <= 1 && myDist <= 1) {
+          if (game.chamberSpeaker?.partyId === game.playerPartyId || (validCoalBill && game.parties.find(x=>x.id===game.chamberSpeaker?.partyId)?.inGov)) {
+            yesShare = Math.min(0.98, yesShare + 0.04);
+          }
+          if (game.senateSpeaker?.partyId === game.playerPartyId || (validCoalBill && game.parties.find(x=>x.id===game.senateSpeaker?.partyId)?.inGov)) {
+            yesShare = Math.min(0.98, yesShare + 0.03);
+          }
+        }
 
         const y = Math.round(pt.seats * yesShare);
         const n = pt.seats - y;
@@ -5155,12 +5330,16 @@
       const passed = yesVotes >= 201;
       if (passed) {
         game.lawStates[law.id] = targetIdx;
+        // Punto 3 (v6.2.1): Moratoria legislativa di 180 giorni dopo l'approvazione di una legge per impedire cambi continui avanti e indietro!
+        game.lawCooldowns[law.id] = game.turn + 180;
         if (opt.eff) opt.eff(game);
         game.leader.prestige = Math.min(100, game.leader.prestige + 7);
         recalcPolls(true);
-        addFeed(`🏛️ <strong>RIFORMA APPROVATA DAL PARLAMENTO (${yesVotes} SÌ - ${noVotes} NO):</strong> Cambia la legge italiana su <em>"${law.title}"</em> → <strong>${opt.status}</strong>!`, 'ok');
+        addFeed(`🏛️ <strong>RIFORMA APPROVATA DAL PARLAMENTO (${yesVotes} SÌ - ${noVotes} NO):</strong> Cambia la legge italiana su <em>"${law.title}"</em> → <strong>${opt.status}</strong>! (Moratoria legislativa: 180 giorni)`, 'ok');
       } else {
-        addFeed(`❌ <strong>DDL BOCCIATO DALL'AULA (${yesVotes} SÌ - ${noVotes} NO):</strong> La proposta di ${game.leader.name} su <em>"${law.title}"</em> viene respinta a Montecitorio. Puoi tentare il Referendum Popolare!`, 'cr');
+        // Se bocciato, il regolamento della Camera impedisce di ripresentare lo stesso DDL per 90 giorni
+        game.lawCooldowns[law.id] = game.turn + 90;
+        addFeed(`❌ <strong>DDL BOCCIATO DALL'AULA (${yesVotes} SÌ - ${noVotes} NO):</strong> La proposta di ${game.leader.name} su <em>"${law.title}"</em> viene respinta a Montecitorio (Non riproponibile in Aula per 90 giorni).`, 'cr');
       }
 
       openModal(
@@ -5168,12 +5347,13 @@
         `<div style="font-size:13px; color:var(--text);">
           Proposta messa ai voti: <strong style="color:var(--gold-lt);">${opt.status}</strong><br>
           <span style="color:var(--muted); font-size:12px;">${opt.label}</span>
+          ${!isInd && myDist >= 2 ? `<div style="margin-top:6px; padding:6px 8px; border-radius:6px; background:rgba(239,68,68,0.16); border:1px solid #ef4444; color:#fca5a5; font-size:11.5px;">⚠️ <strong>Ribellione del Gruppo Parlamentare ${p.short}:</strong> poiché il DDL era contrario al Programma vigente del partito su <em>${dTitle}</em>, i deputati di ${p.short} hanno votato in massa CONTRO (-12% Fiducia Base)!</div>` : ''}
           <div style="display:flex; justify-content:space-around; background:rgba(8,13,24,0.85); border:1px solid var(--bd); border-radius:9px; padding:12px; margin:12px 0;">
             <div style="text-align:center;"><div style="font-size:11px; color:var(--muted);">FAVOREVOLI (SÌ)</div><div style="font-size:24px; font-weight:900; color:#34d399;">${yesVotes}</div></div>
             <div style="text-align:center;"><div style="font-size:11px; color:var(--muted);">QUORUM AULA</div><div style="font-size:20px; font-weight:700; color:var(--gold-lt);">201</div></div>
             <div style="text-align:center;"><div style="font-size:11px; color:var(--muted);">CONTRARI (NO)</div><div style="font-size:24px; font-weight:900; color:#f87171;">${noVotes}</div></div>
           </div>
-          <div style="font-size:11px; color:var(--muted);"><strong>Spaccato Voti Gruppi:</strong> ${breakdown.join(' • ')}</div>
+          <div style="font-size:11px; color:var(--muted);"><strong>Spaccato Voti Gruppi (in base al Programma di ciascun partito su ${dTitle}):</strong><br>${breakdown.join(' • ')}</div>
         </div>`,
         [{ label: "Chiudi Tabellone Elettronico", fn: () => { closeModal(); updateAllUI(); } }]
       );
@@ -5190,6 +5370,11 @@
       const cdLeft = Math.max(0, (game.referendumCooldowns[lawId] || 0) - game.turn);
       if (cdLeft > 0) {
         alert(`⛔ Non puoi indire un nuovo referendum su questo stesso tema subito dopo averne celebrato uno! Per legge costituzionale devono trascorrere almeno 365 giorni (ancora ${cdLeft} giorni).`);
+        return;
+      }
+      const lawCdLeft = Math.max(0, (game.lawCooldowns[lawId] || 0) - game.turn);
+      if (lawCdLeft > 0) {
+        alert(`⏳ Questa legge è appena stata modificata dal Parlamento! Devono trascorrere ancora ${lawCdLeft} giorni di moratoria prima di poter indire un referendum abrogativo sulla nuova norma.`);
         return;
       }
       const law = HOT_LAWS.find(l => l.id === lawId);
@@ -5211,12 +5396,12 @@
       game.parties.forEach(pt => {
         const ptStance = pt.stances[law.dossier] ?? Math.round(getPartyIdeoScore(pt));
         const dist = Math.abs(ptStance - targetStance);
-        const s = dist === 0 ? 84 : (dist === 1 ? 64 : (dist === 2 ? 40 : 16));
+        const s = dist === 0 ? 82 : (dist === 1 ? 58 : (dist === 2 ? 32 : 12));
         weightedSupport += s * pt.poll;
         totalWeight += pt.poll;
       });
-      const leaderBonus = (game.leader.prestige - 50) * 0.18;
-      const initYesPct = Math.max(24, Math.min(78, +(weightedSupport / Math.max(1, totalWeight) + leaderBonus).toFixed(1)));
+      const leaderBonus = (game.leader.prestige - 55) * 0.14;
+      const initYesPct = Math.max(24, Math.min(74, +(weightedSupport / Math.max(1, totalWeight) + leaderBonus).toFixed(1)));
 
       game.activeReferendum = {
         kind: 'law',
@@ -5226,7 +5411,9 @@
         title: law.title,
         targetLabel: `${opt.status} (${opt.label})`,
         daysLeft: 30,
-        yesPct: initYesPct
+        yesPct: initYesPct,
+        ralliesUsed: 0,
+        maxRallies: 3
       };
 
       const rr = document.getElementById('refRibbon');
@@ -7346,11 +7533,13 @@
       const intlPill = document.getElementById('topIntlPill');
       if (intlPill) intlPill.innerText = `${game.inEU ? '🇪🇺 Membro UE' : '🇮🇹 Italexit (Fuori UE)'} • ${game.inNATO ? '🛡️ Membro NATO' : '🕊️ Fuori NATO'}`;
 
-      const fDate = document.getElementById('floatDate');
-      if (fDate) fDate.innerText = fmtDate(game.date);
-      const fAP = document.getElementById('floatAP');
+      const fDate = document.getElementById('ftDateTxt');
+      if (fDate) fDate.innerText = `📅 ${fmtDate(game.date)}`;
+      const fTurn = document.getElementById('ftTurnTxt');
+      if (fTurn) fTurn.innerText = `Giorno ${game.turn}`;
+      const fAP = document.getElementById('ftApTxt');
       if (fAP) fAP.innerText = `${game.ap} ⚡`;
-      const fFunds = document.getElementById('floatFunds');
+      const fFunds = document.getElementById('ftFundsTxt');
       if (fFunds) fFunds.innerText = `€ ${game.funds}k`;
 
       // Ribbons (Campagna Elettorale, Campagna Referendaria 30g, Regime)
@@ -7629,32 +7818,49 @@
       if (bg) bg.classList.remove('open');
     }
 
-    /* PUNTO 13 (v6.2): SELETTORE CUSTOM INTEGRATO NEL MOTORE DI GIOCO CHE SOSTITUISCE IL MENU A TENDINA NATIVO DI MACOS! */
+    /* PUNTO 1 (v6.2.1): SELETTORE CUSTOM INTEGRATO NEL MOTORE DI GIOCO CORRETTO E POTENZIATO CON SCHEDE POLITICI E MINISTRI */
     let activeSelectElement = null;
 
     function initCustomSelectEngine() {
-      document.addEventListener('mousedown', (e) => {
-        const sel = e.target.closest('select');
+      const handleSelectTrigger = (e) => {
+        const sel = e.target && e.target.closest ? e.target.closest('select') : null;
         if (!sel || sel.disabled) return;
         e.preventDefault();
+        e.stopPropagation();
+        if (typeof sel.blur === 'function') sel.blur();
         openGameSelectForElement(sel);
-      }, false);
+      };
+
+      document.addEventListener('mousedown', handleSelectTrigger, true);
+      document.addEventListener('click', (e) => {
+        const sel = e.target && e.target.closest ? e.target.closest('select') : null;
+        if (!sel || sel.disabled) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (!activeSelectElement) openGameSelectForElement(sel);
+      }, true);
 
       document.addEventListener('keydown', (e) => {
-        const sel = e.target.closest && e.target.closest('select');
+        if (e.key === 'Escape' && activeSelectElement) {
+          closeGameSelectModal();
+          return;
+        }
+        const sel = e.target && e.target.closest ? e.target.closest('select') : null;
         if (!sel || sel.disabled) return;
         if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowDown') {
           e.preventDefault();
+          e.stopPropagation();
           openGameSelectForElement(sel);
         }
-      }, false);
+      }, true);
     }
 
     function openGameSelectForElement(selEl) {
       activeSelectElement = selEl;
       const modalBg = document.getElementById('gameSelectModalBg');
       const titleEl = document.getElementById('gsTitle');
-      const searchEl = document.getElementById('gsSearch');
+      const searchWrap = document.getElementById('gsSearchWrap');
+      const searchEl = document.getElementById('gsSearchInput');
       if (!modalBg || !titleEl) return;
 
       // Ricava un titolo contestuale dall'etichetta vicina
@@ -7662,42 +7868,81 @@
       const fld = selEl.closest('.fld') || selEl.closest('.box');
       if (fld) {
         const lbl = fld.querySelector('label, h4, strong');
-        if (lbl && lbl.innerText) labelTxt = lbl.innerText.trim().slice(0, 70);
+        if (lbl && lbl.innerText) labelTxt = lbl.innerText.trim().slice(0, 75);
       }
       titleEl.innerText = `🏛️ ${labelTxt}`;
 
-      if (searchEl) {
-        searchEl.value = '';
-        searchEl.style.display = selEl.options.length > 6 ? 'block' : 'none';
-      }
+      const hasMany = selEl.options.length > 5;
+      if (searchWrap) searchWrap.style.display = hasMany ? 'block' : 'none';
+      if (searchEl) searchEl.value = '';
+
       renderGameSelectOptions('');
       modalBg.classList.add('open');
-      if (searchEl && selEl.options.length > 6) {
+      if (searchEl && hasMany) {
         setTimeout(() => searchEl.focus(), 30);
       }
     }
 
     function renderGameSelectOptions(queryStr) {
-      const listEl = document.getElementById('gsList');
+      const listEl = document.getElementById('gsOptionsList');
       if (!listEl || !activeSelectElement) return;
       const q = (queryStr || '').toLowerCase().trim();
-      const opts = Array.from(activeSelectElement.options);
-      const filtered = opts.filter(o => !q || o.text.toLowerCase().includes(q));
+      const allOpts = Array.from(activeSelectElement.options).map((opt, idx) => ({ opt, idx }));
+
+      // Filtra eventuali opzioni placeholder vuote (es. "-- Proponi Sostituto --") e applica la ricerca
+      const validOpts = allOpts.filter(({ opt }) => opt.value !== '');
+      const sourceOpts = validOpts.length > 0 ? validOpts : allOpts;
+      const filtered = sourceOpts.filter(({ opt }) => {
+        if (!q) return true;
+        if (opt.text.toLowerCase().includes(q)) return true;
+        const pr = PRESET_POLITICIANS.find(x => x.id === opt.value);
+        if (pr && ((pr.desc || '').toLowerCase().includes(q) || (pr.region || '').toLowerCase().includes(q))) return true;
+        return false;
+      });
 
       if (filtered.length === 0) {
-        listEl.innerHTML = `<div style="padding:12px; text-align:center; color:var(--muted); font-size:12px;">Nessuna voce trovata per "${queryStr}".</div>`;
+        listEl.innerHTML = `<div style="padding:14px; text-align:center; color:var(--muted); font-size:12.5px;">Nessuna voce trovata per "${queryStr}".</div>`;
         return;
       }
 
-      listEl.innerHTML = filtered.map((opt) => {
-        const isSel = opt.value === activeSelectElement.value;
+      const partyCatalog = (game.parties && game.parties.length > 0) ? game.parties : INITIAL_PARTIES;
+
+      listEl.innerHTML = filtered.map(({ opt, idx }) => {
+        const isSel = opt.value === activeSelectElement.value && opt.value !== '';
         const isDis = opt.disabled;
-        const safeVal = opt.value.replace(/'/g, "\\'");
+
+        // Arricchimento grafico per Politici Reali (Setup) e Politici/Ministri (In-Game)
+        const presetPol = PRESET_POLITICIANS.find(x => x.id === opt.value);
+        const gamePol = POLITICIANS.find(x => x.id === opt.value);
+        let badgeHtml = '';
+        let subHtml = '';
+
+        if (presetPol) {
+          const pObj = partyCatalog.find(p => p.id === presetPol.partyId);
+          const col = pObj ? pObj.color : '#94a3b8';
+          const short = pObj ? pObj.short : 'IND';
+          const roleLbl = presetPol.role === 'secretary' ? '👑 Segretario' : (presetPol.role === 'member' ? '⚔️ Capocorrente' : '📄 Indipendente');
+          badgeHtml = `<span style="background:${col}26; color:${col}; border:1px solid ${col}88; padding:2px 7px; border-radius:6px; font-size:10.5px; font-weight:900; flex-shrink:0;">${short}</span>`;
+          subHtml = `<div style="font-size:11px; color:var(--muted); margin-top:2px;">${roleLbl} • ${presetPol.region} • ${presetPol.desc || ''}</div>`;
+        } else if (gamePol) {
+          const pObj = partyCatalog.find(p => p.id === gamePol.partyId);
+          const col = pObj ? pObj.color : '#38bdf8';
+          const short = pObj ? pObj.short : 'TECNICO';
+          badgeHtml = `<span style="background:${col}26; color:${col}; border:1px solid ${col}88; padding:2px 7px; border-radius:6px; font-size:10.5px; font-weight:900; flex-shrink:0;">${short}</span>`;
+          subHtml = `<div style="font-size:11px; color:var(--muted); margin-top:2px;">Età: ${gamePol.age}a • Competenza: <strong style="color:#34d399;">${gamePol.comp}/100</strong> • Autorevolezza: ${gamePol.clout || 75}</div>`;
+        }
+
         return `
-          <div class="gs-opt ${isSel ? 'gs-sel' : ''} ${isDis ? 'gs-dis' : ''}" onclick="${isDis ? '' : `pickGameSelectValue('${safeVal}')`}">
-            <span>${opt.text}</span>
-            <span style="font-size:11px; font-weight:900; color:${isSel ? 'var(--gold-lt)' : (isDis ? '#f87171' : 'var(--muted)')};">
-              ${isSel ? '✓ Selezionato' : (isDis ? '⛔ Occupato' : 'Scegli →')}
+          <div class="gs-opt-card ${isSel ? 'selected' : ''} ${isDis ? 'disabled' : ''}" onclick="${isDis ? '' : `pickGameSelectOptionIndex(${idx})`}">
+            <div style="display:flex; align-items:flex-start; gap:9px; flex:1; min-width:0;">
+              ${badgeHtml}
+              <div style="flex:1; min-width:0;">
+                <div style="font-weight:800; color:#fff; font-size:13px; line-height:1.3;">${opt.text}</div>
+                ${subHtml}
+              </div>
+            </div>
+            <span style="font-size:11px; font-weight:900; white-space:nowrap; color:${isSel ? 'var(--gold-lt)' : (isDis ? '#f87171' : '#38bdf8')};">
+              ${isSel ? '✓ Selezionato' : (isDis ? '⛔ Già in carica' : 'Scegli →')}
             </span>
           </div>
         `;
@@ -7708,12 +7953,21 @@
       renderGameSelectOptions(val);
     }
 
-    function pickGameSelectValue(val) {
+    function pickGameSelectOptionIndex(optIdx) {
       if (!activeSelectElement) return;
       const targetEl = activeSelectElement;
+      const opt = targetEl.options[optIdx];
+      if (!opt || opt.disabled) return;
       closeGameSelectModal();
-      targetEl.value = val;
+      targetEl.selectedIndex = optIdx;
+      targetEl.value = opt.value;
       targetEl.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    function pickGameSelectValue(val) {
+      if (!activeSelectElement) return;
+      const idx = Array.from(activeSelectElement.options).findIndex(o => o.value === val);
+      if (idx >= 0) pickGameSelectOptionIndex(idx);
     }
 
     function closeGameSelectModal() {
