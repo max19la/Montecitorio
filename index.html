@@ -6,7 +6,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <title>MONTECITORIO (v6.2.1) — Simulatore Politico</title>
+  <title>MONTECITORIO (v6.3) — Simulatore Politico</title>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -1054,7 +1054,7 @@
   <!-- SCHERMATA MENU PRINCIPALE (PUNTI 12, 13, 14) -->
   <section id="setupView">
     <div class="hero-box">
-      <h1>MONTECITORIO (v6.2.1)</h1>
+      <h1>MONTECITORIO (v6.3)</h1>
       <p class="hero-sub">Simulatore Politico</p>
     </div>
 
@@ -1062,15 +1062,16 @@
     <div class="setup-info-bar">
       <div class="glass" style="border-top-color:var(--gold);">
         <div class="sec-hdr">
-          <span>🔥 Novità dell'Aggiornamento (v6.2.1)</span>
-          <span style="font-size:11px; color:var(--ok); font-weight:800;">Hotfix Selettori, Cronometro & Coerenza DDL</span>
+          <span>🔥 Novità dell'Aggiornamento (v6.3)</span>
+          <span style="font-size:11px; color:var(--ok); font-weight:800;">Governi Tecnici, Bussola 2D, Costituzione & Moduli ES</span>
         </div>
         <div style="font-size:12.5px; color:var(--muted); line-height:1.5; max-height:210px; overflow-y:auto; padding-right:6px;">
-          • <strong>Selettore Politici e Ministri In-Engine Corretto e Arricchito</strong>: riparato e potenziato il menu di selezione dei 48 Politici Reali nel Setup, dei 15 Ministri e dei Presidenti di Camera e Senato, con schede visive complete di badge partito, età, competenza e ricerca istantanea.<br>
-          • <strong>Coerenza Programmatica Obbligatoria sui DDL in Aula</strong>: non puoi più far votare ai tuoi parlamentari un DDL contrario al Programma vigente del tuo partito (es. FdI sul matrimonio egualitario o cannabis). Ogni DDL mostra il badge di allineamento programmatico col tuo partito e i parlamentari votano rigorosamente secondo il programma sul dossier.<br>
-          • <strong>Stop Cambio Ripetuto dei Temi Caldi (Moratoria Legislativa)</strong>: introdotta la moratoria parlamentare di 180 giorni dopo la modifica di una legge (oltre al vincolo di 365 giorni sui referendum) per impedire ribaltamenti continui della stessa norma.<br>
-          • <strong>Pulsantiera Flottante del Tempo Ridisegnata e Sincronizzata</strong>: grafica istituzionale rinnovata e aggiornamento in tempo reale di data, giorno, Capitale Politico (⚡) e Tesoreria ad ogni turno.<br>
-          • <strong>15 Ministeri, Unicità Cariche, Scheda Partito Universale & Candidatura al Quirinale</strong>: tutte le novità sistemiche della serie 6.2 pienamente operative.
+          • <strong>Governi Tecnici e Fine del Limbo Elettorale (Punti 1 & 5)</strong>: se le trattative politiche falliscono o cade un governo a metà legislatura, il Quirinale conferisce un mandato tecnico d'emergenza (Draghi, Monti, Cottarelli, Franco, Panetta o Premier tecnico) con priorità di bilancio o riforme, evitando elezioni continue ogni mese.<br>
+          • <strong>Bussola Politica 2D e Schede di 119 Politici (Punti 16 & 20)</strong>: ogni politico (e il giocatore) possiede coordinate cartesiane 2D (Economia: Stato vs Mercato; Società: Civile vs Tradizione), biografia, incarichi e storico; tesseramento e lealtà vincolati alla distanza ideologica.<br>
+          • <strong>Fedeltà Costituzionale al Quirinale (Punti 2, 7, 8 & 9)</strong>: rispetto dell'Art. 88 (divieto scioglimento nel Semestre Bianco e con maggioranza), Art. 84 c. 2 (divieto assoluto cumulo cariche con decadenza immediata da Premier/Ministro), candidatura IA basata su età e contesto, voto al Quirinale riservato a chi ha Grandi Elettori parlamentari.<br>
+          • <strong>Eventi Super-Contestuali e Prerogative Parlamentari (Punti 10, 14 & 15)</strong>: eventi del mondo filtrati rigorosamente per ruolo (Premier, Ministro, Opposizione, Base, Indipendente, Quirinale, Esilio); DDL e mozioni parlamentari riservate a forze con seggi.<br>
+          • <strong>Dinamismo Partitico, Scissioni & Coalizioni (Punti 3, 11, 12 & 18)</strong>: primarie e congressi IA per cambio segreteria, scissioni procedurali con nomi realistici (7 famiglie politiche), inviti a coalizioni bilanciati su veti e fedeltà, divieto di cambio programma per i semplici tesserati (Punto 13).<br>
+          • <strong>Feedback Macroeconomico, Esilio & Post-Golpe (Punti 17, 19, 21 & 22)</strong>: impatto reale di Spread e PIL su consensi e stabilità; ricostituzione partiti dopo la caduta di una dittatura; gestione dell'esilio all'estero; Consiglio dei Ministri dinamico al posto della vecchia lista DDL.
         </div>
       </div>
 
@@ -1319,6 +1320,17 @@
         <button class="btn" style="padding:4px 10px; font-size:11.5px;" onclick="closePartyInspectorModal()">✕ Chiudi Scheda</button>
       </div>
       <div id="piBody" style="font-size:13px; color:var(--txt); line-height:1.5; max-height:76vh; overflow-y:auto; padding-right:4px;"></div>
+    </div>
+  </div>
+
+  <!-- PUNTO 16 & 20: MODAL SCHEDA BIOGRAFICA POLITICO & BUSSOLA POLITICA 2D -->
+  <div class="modal-bg" id="politicianModalBg" style="z-index:13000;" onclick="if(event.target.id==='politicianModalBg')closePoliticianModal()">
+    <div class="modal-w" style="max-width:720px; width:95%;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <span class="m-tag" id="polModalTag" style="margin-bottom:0;">SCHEDA BIOGRAFICA & BUSSOLA 2D</span>
+        <button class="btn" style="padding:4px 10px; font-size:11.5px;" onclick="closePoliticianModal()">✕ Chiudi Scheda</button>
+      </div>
+      <div id="polModalBody" style="font-size:13px; color:var(--txt); line-height:1.5; max-height:78vh; overflow-y:auto; padding-right:4px;"></div>
     </div>
   </div>
 
