@@ -3,7 +3,7 @@
 // Stato della Partita, Variabili Reattive, Accessor e Persistenza
 // =========================================================================
 
-import { FALLBACK_REGIONS, POLITICIANS, MINISTRIES, DOSSIERS } from './data.js';
+import { FALLBACK_REGIONS, POLITICIANS, MINISTRIES, DOSSIERS, INITIAL_PARTIES } from './data.js';
 
 export function fmtDate(d) {
       if (!d || !(d instanceof Date)) return "03 Nov 2026";
@@ -31,7 +31,7 @@ export const game = {
       turnActionsUsed:[],
       regCooldowns:{},
       lastNoConfidenceTurn:-999,
-      leader:{ name:"Giorgia Meloni", age:49, gender:"F", region:"Lazio", personalIdeo:3.3, prestige:84, internalSupport:82 },
+      leader:{ name:"Giorgia Meloni", age:49, gender:"F", region:"Lazio", personalIdeo:3.3, prestige:84, internalSupport:82, compass:{ economic:0.9, social:1.4, ideoScore:3.3 } },
       playerPartyId:'fdi',
       partyRole:'secretary', // 'secretary' | 'member' | 'independent'
       funds:450,
@@ -41,6 +41,11 @@ export const game = {
       gdp:0.8,
       currentPM:"Giorgia Meloni",
       currentGovCoalId:"cdx",
+      isTechnicalGov:false,
+      technocratPM:null,
+      govPriority:'stabilità',
+      lastElectionTurn:-999,
+      legislature:19,
       // ORDINAMENTO DELLO STATO E REGIME / GOLPE (PUNTI 4, 5, 8, 17)
       stateForm:'parlamentare', // 'parlamentare' | 'presidenziale' | 'premierato' | 'cancellierato' | 'federale' | 'assembleare'
       isDictatorship:false,
@@ -189,6 +194,60 @@ export function getPlayerMinistry() {
       return null;
     }
 
+export function vacateOfficesForPresident(target) {
+  if (!target) return;
+  const name = typeof target === 'object' ? target.name : target;
+  const clean = String(name).replace(/\s*\(Tecnico\)|\s*\(Indip\.\)|\s*\(Bis\)/gi, '').trim();
+
+  // If was PM
+  if (game.currentPM && game.currentPM.replace(/\s*\(Tecnico\)|\s*\(Indip\.\)|\s*\(Bis\)/gi, '').trim() === clean) {
+    game.currentPM = "Interim / Vacante";
+    game.govStability = Math.max(20, game.govStability - 25);
+  }
+
+  // If Senate Speaker
+  if (game.senateSpeaker && game.senateSpeaker.name.replace(/\s*\(Tecnico\)|\s*\(Indip\.\)|\s*\(Bis\)/gi, '').trim() === clean) {
+    const alt = POLITICIANS.find(p => p.partyId === 'fdi' && p.name !== clean && p.age >= 50) || POLITICIANS.find(p => p.partyId === 'tech' && p.age >= 50);
+    game.senateSpeaker = alt ? { id: alt.id, name: alt.name, partyId: alt.partyId } : { id: 'vice_sen', name: 'Vicepresidente Vicario del Senato', partyId: 'ind' };
+  }
+
+  // If Chamber Speaker
+  if (game.chamberSpeaker && game.chamberSpeaker.name.replace(/\s*\(Tecnico\)|\s*\(Indip\.\)|\s*\(Bis\)/gi, '').trim() === clean) {
+    const alt = POLITICIANS.find(p => p.partyId === 'lega' && p.name !== clean && p.age >= 50) || POLITICIANS.find(p => p.partyId === 'tech' && p.age >= 50);
+    game.chamberSpeaker = alt ? { id: alt.id, name: alt.name, partyId: alt.partyId } : { id: 'vice_cam', name: 'Vicepresidente Vicario della Camera', partyId: 'ind' };
+  }
+
+  // If Minister
+  if (game.cabinet) {
+    for (const mId in game.cabinet) {
+      const holder = game.cabinet[mId];
+      if (holder && holder.name && holder.name.replace(/\s*\(Tecnico\)|\s*\(Indip\.\)|\s*\(Bis\)/gi, '').trim() === clean) {
+        delete game.cabinet[mId];
+      }
+    }
+  }
+}
+
+export function isSemestreBianco() {
+  if (!game.president || !game.president.endDate) return false;
+  const pEnd = new Date(game.president.endDate).getTime();
+  const now = new Date(game.date).getTime();
+  const sixMonthsMs = 182.5 * 24 * 3600 * 1000;
+  const isPresidentLast6Months = (pEnd - now) <= sixMonthsMs && (pEnd - now) > 0;
+  const legEnd = new Date(game.nextElectionDate).getTime();
+  const isLegLast6Months = (legEnd - now) <= sixMonthsMs && (legEnd - now) > 0;
+  return isPresidentLast6Months && !isLegLast6Months;
+}
+
+export function getPoliticiansForParty(partyId) {
+  return POLITICIANS.filter(p => p.partyId === partyId);
+}
+
+export function getPoliticianById(id) {
+  if (!id) return null;
+  return POLITICIANS.find(p => p.id === id || p.name === id);
+}
+
     /* Restituisce la carica già ricoperta da un politico (ignorando lo slot che si sta modificando), così NESSUNO può avere 2 cariche contemporaneamente! */
 export function getPersonCurrentOffice(polOrIdOrName, ignoreSlot = null, useDraft = false) {
       if (!polOrIdOrName) return null;
@@ -250,7 +309,8 @@ export function getP() {
           credibility:game.leader.prestige, cohesion:100, orgStrength:35, stances:game.personalStances, baseStances:game.personalStances, vetoes:[]
         };
       }
-      return game.parties.find(p => p.id === game.playerPartyId) || game.parties[0];
+      const partyList = (game.parties && game.parties.length > 0) ? game.parties : INITIAL_PARTIES;
+      return partyList.find(p => p.id === game.playerPartyId) || partyList[0];
     }
 
 export function getPartyIdeoScore(p) {

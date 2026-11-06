@@ -20,6 +20,8 @@ import {
   NEW_LAST_NAMES,
   EXEC_DECREES,
   DISTINCT_PALETTE,
+  SPLIT_POOLS,
+  REGIONAL_PROFILES,
   getPartySVG
 } from './data.js';
 
@@ -41,6 +43,10 @@ import {
   ensurePlayerInPoliticians,
   getPlayerMinistry,
   getPersonCurrentOffice,
+  vacateOfficesForPresident,
+  isSemestreBianco,
+  getPoliticiansForParty,
+  getPoliticianById,
   getPartyIdeoScore,
   getIdeoLabel,
   computePartyDrift,
@@ -55,7 +61,7 @@ import {
 // Safe UI bridge delegators
 const addFeed = (msg, type) => (typeof window !== 'undefined' && window.addFeed ? window.addFeed(msg, type) : console.log(msg));
 const setTicker = (msg) => (typeof window !== 'undefined' && window.setTicker ? window.setTicker(msg) : null);
-const openModal = () => (typeof window !== 'undefined' && window.openModal ? window.openModal() : null);
+const openModal = (...args) => (typeof window !== 'undefined' && window.openModal ? window.openModal(...args) : null);
 const closeModal = () => (typeof window !== 'undefined' && window.closeModal ? window.closeModal() : null);
 const updateAllUI = () => (typeof window !== 'undefined' && window.updateAllUI ? window.updateAllUI() : null);
 
@@ -138,9 +144,67 @@ export function initRegOrg() {
 
 export function updateRegPolls() {
       FALLBACK_REGIONS.forEach(r => {
-        let sum = 0; const raw = {};
-        game.parties.forEach(p => { raw[p.id] = p.poll * ((game.regOrg[r.id]?.[p.id] || 50) / 60); sum += raw[p.id]; });
-        game.parties.forEach(p => { game.regionPolls[r.id][p.id] = +((raw[p.id] / (sum || 1)) * 100).toFixed(1); });
+        const prof = (typeof REGIONAL_PROFILES !== 'undefined' && (REGIONAL_PROFILES[r.name] || REGIONAL_PROFILES[r.id])) || { lean:'Centro', businessWeight:1.0, welfareWeight:1.0, autonomyWeight:1.0, favIssues:[] };
+        let sum = 0;
+        const raw = {};
+        game.parties.forEach(p => {
+          const ideo = getPartyIdeoScore(p);
+          let weight = 1.0;
+
+          // 1. Allineamento Ideologico Territoriale
+          if (prof.lean.includes('Destra') && ideo >= 2.5) {
+            weight *= (1.20 + (ideo - 2.5) * 0.15);
+          } else if (prof.lean.includes('Sinistra') && ideo <= 1.8) {
+            weight *= (1.24 + (1.8 - ideo) * 0.18);
+          } else if (prof.lean.includes('Centro') && ideo >= 1.8 && ideo <= 2.8) {
+            weight *= 1.15;
+          }
+
+          // 2. Dossier Tematici Regionali
+          if (prof.autonomyWeight > 1.3) {
+            const instStance = p.stances?.inst ?? 2;
+            if (instStance >= 3 || ['lega','svp','fn','sc_nord'].includes(p.id)) {
+              weight *= (1.10 * prof.autonomyWeight);
+            } else if (instStance === 0) {
+              weight *= 0.85;
+            }
+          }
+          if (prof.businessWeight > 1.3) {
+            const taxStance = p.stances?.tax ?? 2;
+            if (taxStance >= 3 || ['fdi','fi','az','iv','lega'].includes(p.id)) {
+              weight *= (1.08 * prof.businessWeight);
+            } else if (taxStance === 0) {
+              weight *= 0.88;
+            }
+          }
+          if (prof.welfareWeight > 1.4) {
+            const welStance = p.stances?.welfare ?? 2;
+            if (welStance <= 1 || ['m5s','pd','avs','prc'].includes(p.id)) {
+              weight *= (1.12 * prof.welfareWeight);
+            } else if (welStance >= 3) {
+              weight *= 0.85;
+            }
+          }
+
+          // 3. Roccaforti territoriali e partiti locali
+          if (p.id === 'svp' && ((r.name && r.name.includes('Trentino')) || (r.id && r.id.includes('Trentino')) || r.id === 'taa')) weight *= 16.0;
+          if (p.id === 'scn' && ((r.name && r.name.includes('Sicilia')) || (r.id && r.id.includes('Sicilia')) || r.id === 'sic')) weight *= 4.5;
+          if (p.id === 'lega' && ['Veneto','Lombardia'].includes(r.id)) weight *= 1.45;
+          if (p.id === 'pd' && ['Emilia-Romagna','Toscana'].includes(r.id)) weight *= 1.40;
+          if (p.id === 'm5s' && ['Campania','Sicilia','Calabria'].includes(r.id)) weight *= 1.35;
+
+          // Radicamento organizzativo
+          const orgBonus = (game.regOrg[r.id]?.[p.id] || 50) / 50;
+          weight *= Math.max(0.65, Math.min(1.4, orgBonus));
+
+          raw[p.id] = Math.max(0.08, p.poll * weight);
+          sum += raw[p.id];
+        });
+
+        if (!game.regionPolls[r.id]) game.regionPolls[r.id] = {};
+        game.parties.forEach(p => {
+          game.regionPolls[r.id][p.id] = +((raw[p.id] / (sum || 1)) * 100).toFixed(1);
+        });
       });
     }
 
@@ -873,10 +937,20 @@ export function triggerRegimeOverthrow() {
       game.isDictatorship = false;
       game.dictatorshipName = null;
       game.stateForm = 'parlamentare';
+      game.outlawedParties = [];
       document.body.classList.remove('theme-regime');
-      document.getElementById('regimeRibbon').style.display = 'none';
-      addFeed(`🗽 <strong>INSURREZIONE POPOLARE E CADUTA DELLA DITTATURA!</strong> Il popolo italiano e i reparti dell'Esercito rovesciano il regime di <strong>${game.leader.name}</strong> e restaurano la Repubblica Democratica!`, 'cr');
-      setTicker(`LIBERAZIONE A ROMA: Crolla la Dittatura di ${game.leader.name}! Restaurata la Costituzione.`);
+      const regRibbon = document.getElementById('regimeRibbon');
+      if (regRibbon) regRibbon.style.display = 'none';
+
+      // Ripristina tutti i partiti democratici e costituzionali sciolti dalla dittatura
+      INITIAL_PARTIES.forEach(ip => {
+        if (!game.parties.some(p => p.id === ip.id)) {
+          game.parties.push(JSON.parse(JSON.stringify(ip)));
+        }
+      });
+
+      addFeed(`🗽 <strong>INSURREZIONE POPOLARE E CADUTA DELLA DITTATURA!</strong> Il popolo italiano e i reparti dell'Esercito rovesciano il regime di <strong>${game.leader.name}</strong> e restaurano la Repubblica Democratica Costituzionale! Tutti i partiti democratici tornano alla legalità.`, 'cr');
+      setTicker(`LIBERAZIONE A ROMA: Crolla la Dittatura! Restaurata la Costituzione.`);
       openFailedCoupTrialModal("Rovesciamento della Dittatura da parte dell'insurrezione popolare e delle Forze Armate");
     }
 
@@ -885,6 +959,7 @@ export function weeklyAIDynamicsAndCoalitionEvolution() {
       const actor = aiList[Math.floor(Math.random() * aiList.length)];
       if (!actor) return;
 
+      // 1. Uscita o rottura della coalizione per divergenza o insoddisfazione
       if (actor.coalId !== 'none') {
         const cLead = getCoalLeaderParty(actor.coalId);
         if (cLead && cLead.id !== actor.id) {
@@ -910,6 +985,36 @@ export function weeklyAIDynamicsAndCoalitionEvolution() {
             actor.coalId = cid;
             addFeed(`🤝 <strong>RICONFIGURAZIONE ALLEANZE:</strong> Con il voto favorevole dei membri (${vote.pct}%), <strong>${actor.name}</strong> entra in <strong>${getCoalName(cid)}</strong>!`, 'ai');
             break;
+          }
+        }
+      }
+
+      // 2. Punto 3: Turnover e Congressi dei partiti controllati dall'IA
+      if (Math.random() < 0.12 && (actor.cohesion < 55 || actor.poll < 4.0 || (game.turn % 24 === 0))) {
+        const partyPols = getPoliticiansForParty(actor.id).filter(pol => pol.name !== actor.leader && !pol.isPlayer);
+        if (partyPols.length > 0) {
+          const challenger = [...partyPols].sort((a,b) => (b.clout + b.comp) - (a.clout + a.comp))[0];
+          if (challenger && challenger.clout >= (actor.leaderTrust || 60) - 10) {
+            const oldSec = actor.leader;
+            actor.leader = challenger.name;
+            actor.leaderAge = challenger.age;
+            actor.leaderTrust = Math.min(95, challenger.clout + 5);
+            actor.cohesion = Math.min(92, (actor.cohesion || 65) + 18);
+
+            if (challenger.compass) {
+              const targetScore = challenger.compass.ideoScore ?? getPartyIdeoScore(actor);
+              DOSSIERS.forEach(d => {
+                if (Math.random() < 0.25) {
+                  const cur = actor.stances[d.key] ?? 2;
+                  actor.stances[d.key] = targetScore > 2.2 ? Math.min(4, cur + 1) : (targetScore < 1.8 ? Math.max(0, cur - 1) : cur);
+                }
+              });
+              actor.area = getIdeoLabel(getPartyIdeoScore(actor)).replace(/^[^\s]+\s/, '');
+            }
+
+            addFeed(`🏛️ <strong>CONGRESSO NAZIONALE ${actor.short.toUpperCase()}:</strong> Cambio alla segreteria! <strong>${challenger.name}</strong> (${challenger.age}a) vince le primarie contro la linea di ${oldSec} e diventa il nuovo Segretario Nazionale di <strong>${actor.name}</strong>!`, 'ai');
+            setTicker(`CONGRESSO ${actor.short}: ${challenger.name} eletto nuovo Segretario!`);
+            return;
           }
         }
       }
@@ -954,10 +1059,30 @@ export function executePartySplit(parentParty, isPlayerSplitting, customStances 
       const newLeaderAge = isPlayerSplitting ? game.leader.age : (parentParty.wingAge || 46);
       const risingWing = generateNewPolitician(splitId);
 
+      // Selezione procedurale autentica da SPLIT_POOLS per famiglia ideologica
+      let fam = 'destra';
+      if (parentParty.id === 'm5s') fam = 'm5s';
+      else if (['svp','scn','liga'].includes(parentParty.id)) fam = 'autonomisti';
+      else {
+        const score = getPartyIdeoScore(parentParty);
+        if (score < 1.15) fam = 'sinistra';
+        else if (score < 1.75) fam = 'centrosinistra';
+        else if (score < 2.35) fam = 'centro';
+        else if (score < 2.95) fam = 'centrodestra';
+        else fam = 'destra';
+      }
+      const pool = (typeof SPLIT_POOLS !== 'undefined' && SPLIT_POOLS[fam]) ? SPLIT_POOLS[fam] : [];
+      const unusedEntry = pool.find(item => !game.parties.some(p => p.short === item.short || p.name === item.name)) || pool[0];
+
+      const splitChosenName = unusedEntry ? unusedEntry.name : `Alternativa ${parentParty.short}`;
+      const splitChosenShort = unusedEntry ? unusedEntry.short : `N${parentParty.short.slice(0,2)}`;
+      const splitChosenColor = (unusedEntry && unusedEntry.color) || uniqueColor;
+      const splitWingName = (unusedEntry && unusedEntry.wing) || "Area Riformista";
+
       const newParty = {
         id:splitId,
-        name:isPlayerSplitting ? (prompt("Nome del tuo nuovo partito scissionista:", parentParty.splitName || "Nuovo Polo") || "Nuovo Polo") : (parentParty.splitName || `Alternativa ${parentParty.short}`),
-        short:parentParty.splitShort || ("N" + parentParty.short.slice(0,2)),
+        name:isPlayerSplitting ? (prompt("Nome del tuo nuovo partito scissionista:", splitChosenName) || splitChosenName) : splitChosenName,
+        short:isPlayerSplitting ? (prompt("Sigla del tuo nuovo partito (2-4 lettere):", splitChosenShort) || splitChosenShort) : splitChosenShort,
         leader:newLeaderName,
         leaderAge:newLeaderAge,
         leaderTrust:88,
@@ -966,7 +1091,7 @@ export function executePartySplit(parentParty, isPlayerSplitting, customStances 
         nextCongYear:game.date.getFullYear() + 3,
         area:getIdeoLabel(getPartyIdeoScore({stances:newStances})).replace(/^[^\s]+\s/, ''),
         coalId:'none',
-        color:uniqueColor,
+        color:splitChosenColor,
         emblemType:uniqueEmblem,
         poll:+(parentParty.poll * splitShare).toFixed(1),
         seats:movedSeats,
@@ -976,14 +1101,14 @@ export function executePartySplit(parentParty, isPlayerSplitting, customStances 
         orgStrength:56,
         wingLeader:risingWing.name,
         wingAge:risingWing.age,
-        wingName:"Area Territoriale",
+        wingName:splitWingName,
         wingArea:parentParty.area,
         factions:[
           { name:`Area Fondatrice (${newLeaderName})`, leader:newLeaderName, share:70, desc:"Nucleo guida della scissione." },
           { name:"Circoli Territoriali", leader:risingWing.name, share:30, desc:"Rete locale del nuovo partito." }
         ],
-        splitName:`Riformisti ${parentParty.short}`,
-        splitShort:`R${parentParty.short.slice(0,2)}`,
+        splitName:splitChosenName,
+        splitShort:splitChosenShort,
         bio:`Partito nato dalla scissione da ${parentParty.name} guidata da ${newLeaderName}.`,
         vetoes:[parentParty.id],
         stances:newStances,
@@ -1042,45 +1167,69 @@ export function weeklyMacroStep() {
       b.debtToGDP = +(b.debtToGDP + (b.deficit - game.gdp)*0.04).toFixed(1);
       const euPenalty = !game.inEU ? 35 : (game.foreignRels.eu_com < 40 ? 12 : 0);
       game.spread = Math.max(60, Math.min(520, Math.round(game.spread + (b.deficit - 3.0)*3.2 + (70 - game.govStability)*0.20 - (avgComp - 80)*0.4 + euPenalty * 0.08)));
-      if (game.spread > 250) {
-        game.parties.filter(p=>p.inGov).forEach(p => { p.credibility = Math.max(20, p.credibility - 3); shiftBloc(p.id,'pensionati',-3); });
-        if (!game.isDictatorship) game.govStability = Math.max(0, game.govStability - 5);
-        addFeed(`🚨 <strong>ALLARME SPREAD (${game.spread} pt):</strong> Tensione sui BTP, cala la fiducia nel Governo!`, 'cr');
+
+      // Punto 19: Feedback macroeconomico realistico sulla tenuta del governo e consensi
+      if (game.spread > 200 || game.gdp < -0.5) {
+        const severity = (game.spread > 260 || game.gdp < -1.2) ? 2 : 1;
+        if (!game.isDictatorship) {
+          game.govStability = Math.max(0, game.govStability - 3 * severity);
+        }
+        game.parties.filter(p=>p.inGov).forEach(p => {
+          p.credibility = Math.max(20, p.credibility - 2 * severity);
+          p.poll = Math.max(1.0, +(p.poll - 0.12 * severity).toFixed(1));
+          game.allySatisfaction[p.id] = Math.max(15, (game.allySatisfaction[p.id] || 75) - 3 * severity);
+        });
+        if (game.spread > 230) {
+          addFeed(`🚨 <strong>FIBRILLAZIONE ECONOMICA:</strong> Spread a <strong>${game.spread} pt</strong> e PIL a <strong>${game.gdp}%</strong>: la maggioranza trema, calano i consensi del Governo (-Stabilità, -Fiducia Alleati)!`, 'cr');
+        }
+      } else if (game.spread <= 110 && game.gdp >= 1.0) {
+        game.govStability = Math.min(100, game.govStability + 2);
+        game.parties.filter(p=>p.inGov).forEach(p => {
+          p.credibility = Math.min(95, p.credibility + 1);
+          p.poll = Math.min(45.0, +(p.poll + 0.1).toFixed(1));
+          game.allySatisfaction[p.id] = Math.min(100, (game.allySatisfaction[p.id] || 75) + 2);
+        });
       }
     }
 
-    /* PUNTO 3 (v6.2): EVENTI SETTIMANALI PROFONDAMENTE CONTESTUALI AL RUOLO DEL GIOCATORE */
+    /* PUNTI 3 & 10: EVENTI SETTIMANALI PROFONDAMENTE CONTESTUALI AL RUOLO EFFETTIVO DEL GIOCATORE */
 export function triggerWorldEvent() {
       const p = getP();
       const myMin = getPlayerMinistry();
-      const specificRoles = [];
-      if (game.president.isPlayer) {
-        specificRoles.push('president_rep');
-      } else if (game.partyRole === 'independent') {
-        specificRoles.push('ind');
-        if (game.currentPM === game.leader.name) specificRoles.push('pm');
-        if (myMin) specificRoles.push('minister');
+      const isPM = (game.currentPM === game.leader.name || game.currentPM === `${game.leader.name} (Tecnico)`);
+      const isPresident = !!game.president.isPlayer;
+      const isExile = !!game.inExile;
+      const isInd = (game.partyRole === 'independent' || game.playerPartyId === 'ind');
+      const isMember = (game.partyRole === 'member');
+      const isOpp = (!p.inGov && !isPresident);
+
+      let allowedRoles = [];
+      if (isExile) {
+        allowedRoles = ['exile'];
+      } else if (isPresident) {
+        allowedRoles = ['president_rep'];
+      } else if (isPM) {
+        allowedRoles = ['pm'];
+      } else if (myMin) {
+        allowedRoles = ['minister'];
+      } else if (isInd) {
+        allowedRoles = ['ind'];
+      } else if (isMember) {
+        allowedRoles = ['party_member'];
+      } else if (isOpp) {
+        allowedRoles = ['opp', 'party_member'];
       } else {
-        specificRoles.push('party');
-        if (game.currentPM === game.leader.name) {
-          specificRoles.push('pm');
-        } else if (myMin) {
-          specificRoles.push('minister', 'gov_ally');
-        } else if (p.inGov) {
-          specificRoles.push('gov_ally');
-        } else {
-          specificRoles.push('opp');
-        }
+        allowedRoles = ['party_member', 'gov_ally'];
       }
 
-      // Privilegia gli eventi specifici per il ruolo attuale del giocatore!
-      let pool = WORLD_EVENTS.filter(e => !game.seenEvents.has(e.id) && specificRoles.includes(e.role));
+      // Privilegia strettamente gli eventi specifici per il ruolo effettivo del giocatore!
+      let pool = WORLD_EVENTS.filter(e => !game.seenEvents.has(e.id) && allowedRoles.includes(e.role));
       if (pool.length === 0) {
-        pool = WORLD_EVENTS.filter(e => !game.seenEvents.has(e.id) && (specificRoles.includes(e.role) || e.role === 'any'));
+        pool = WORLD_EVENTS.filter(e => !game.seenEvents.has(e.id) && (allowedRoles.includes(e.role) || e.role === 'any'));
       }
       if (pool.length === 0) {
         game.seenEvents.clear();
-        pool = WORLD_EVENTS.filter(e => specificRoles.includes(e.role) || e.role === 'any');
+        pool = WORLD_EVENTS.filter(e => allowedRoles.includes(e.role) || e.role === 'any');
       }
       const ev = pool[Math.floor(Math.random() * pool.length)];
       if (!ev) return;
@@ -1128,6 +1277,7 @@ export function openDirectPresidentialElectionModal() {
         btn.onclick = () => {
           const won = c.isPlayer ? (c.pollBase + Math.random()*14 >= topCandidates[1].pollBase) : true;
           const winner = won ? c : topCandidates[1];
+          vacateOfficesForPresident(winner.name);
           game.president.name = winner.name;
           game.president.age = winner.age;
           game.president.area = `Presidente Eletto dal Popolo (${winner.partyName})`;
@@ -1145,14 +1295,32 @@ export function openDirectPresidentialElectionModal() {
       openModal();
     }
 
-    /* PUNTI 7, 8 & 9 (v6.2): ELEZIONE DEL PRESIDENTE DELLA REPUBBLICA REALISTICA (4-6 SCRUTINI), SENZA LOOP INFINITO DA INDIPENDENTE E CON POSSIBILITÀ DI ESSERE ELETTO AL QUIRINALE! */
+    /* PUNTI 7, 8 & 9: ELEZIONE DEL PRESIDENTE DELLA REPUBBLICA (ARTT. 83-84 COST.) CON CANDIDATI DINAMICI, DISTINZIONE GRANDI ELETTORI E UNICITÀ RIGOROSA DELLE CARICHE */
 export function openQuirinaleBallotModal(ballotNum = 1) {
+      if (game.inExile) {
+        alert("❌ SEI IN ESILIO ALL'ESTERO:\nUn latitante in esilio non può candidarsi al Quirinale né partecipare al voto dei Grandi Elettori!");
+        return;
+      }
       const player = getP();
       const quorum = ballotNum <= 3 ? 267 : 201;
       const myIdeo = game.leader.personalIdeo ?? getPartyIdeoScore(player);
+      const isIndependentWithoutSeats = (game.partyRole === 'independent' || player.id === 'ind') && (player.seats === 0);
 
-      // Punto 9 v6.2: Il giocatore può candidarsi personalmente al Quirinale!
-      const playerCand = {
+      // Punto 8: Candidati PdR dinamici da POLITICIANS con age >= 50 e alto profilo
+      const eligiblePols = POLITICIANS.filter(p => p.age >= 50 && (p.clout >= 65 || p.comp >= 82) && !p.isPlayer);
+      const dynamicCands = eligiblePols.slice(0, 10).map(p => ({
+        id: p.id,
+        name: p.name,
+        age: p.age,
+        area: p.role || (p.partyId === 'tech' ? 'Tecnico Istituzionale' : `Area ${p.partyId.toUpperCase()}`),
+        idealIdeo: p.compass?.ideoScore ?? 2.0,
+        trust: Math.max(75, Math.round((p.clout + p.comp) / 2)),
+        desc: p.bio || `${p.name}, figura di garanzia e prestigio istituzionale.`
+      }));
+
+      // Candidatura del giocatore se ha almeno 50 anni (Art. 84 Cost.)
+      const canPlayerCandidate = (game.leader.age >= 50);
+      const playerCand = canPlayerCandidate ? {
         id: 'player_cand',
         name: game.leader.name,
         age: game.leader.age,
@@ -1160,27 +1328,30 @@ export function openQuirinaleBallotModal(ballotNum = 1) {
         idealIdeo: myIdeo,
         trust: Math.max(78, game.leader.prestige),
         isPlayer: true,
-        desc: `La tua candidatura personale al Quirinale (Prestigio: ${game.leader.prestige}%, Grandi Elettori del tuo gruppo: ${player.seats}).`
-      };
+        desc: `La tua candidatura al Quirinale (Prestigio: ${game.leader.prestige}%, Grandi Elettori: ${player.seats}).`
+      } : null;
 
-      const allCandidates = [playerCand, ...PRES_CANDIDATES.filter(c => c.name !== game.leader.name)];
+      const baseCandidates = dynamicCands.length ? dynamicCands : PRES_CANDIDATES;
+      const allCandidates = playerCand ? [playerCand, ...baseCandidates.filter(c => c.name !== game.leader.name)] : baseCandidates;
       const aiSupport = {};
       allCandidates.forEach(c => aiSupport[c.id] = []);
 
       game.parties.filter(p => p.id !== player.id && p.seats > 0).forEach(p => {
         const pIdeo = getPartyIdeoScore(p);
-        const bestCand = [...PRES_CANDIDATES].sort((a,b) => Math.abs(a.idealIdeo - pIdeo) - Math.abs(b.idealIdeo - pIdeo))[0];
+        const bestCand = [...baseCandidates].sort((a,b) => Math.abs(a.idealIdeo - pIdeo) - Math.abs(b.idealIdeo - pIdeo))[0];
         if (bestCand && aiSupport[bestCand.id]) aiSupport[bestCand.id].push(p);
       });
 
-      // Punto 8 v6.2: Dal 4° scrutinio (quorum 201) i grandi elettori convergono rapidamente per evitare scrutini infiniti!
-      const convergenceBonus = ballotNum <= 2 ? 0 : (ballotNum === 3 ? 22 : (ballotNum === 4 ? 48 : (ballotNum === 5 ? 85 : 135)));
+      const convergenceBonus = ballotNum <= 2 ? 0 : (ballotNum === 3 ? 24 : (ballotNum === 4 ? 50 : (ballotNum === 5 ? 88 : 140)));
 
       document.getElementById('mTag').textContent = `ELEZIONE DEL CAPO DELLO STATO • ${ballotNum}° SCRUTINIO (QUORUM: ${quorum} SU 400)`;
       document.getElementById('mTitle').textContent = `🏛️ Parlamento in Seduta Comune (Presiede ${game.chamberSpeaker?.name || 'il Presidente della Camera'}): Scrutinio #${ballotNum}`;
       document.getElementById('mBody').innerHTML = `
-        Nei primi 3 scrutini serve il quorum dei <strong>2/3 (267 voti)</strong>; dal <strong>4° scrutinio</strong> basta la <strong>maggioranza assoluta (201 voti)</strong> e i poli convergono su un nome condiviso.<br>
-        Controlli direttamente <strong>${player.seats} grandi elettori</strong> (${game.partyRole === 'independent' ? `Indipendente • Prestigio Istituzionale: <strong>${game.leader.prestige}%</strong>` : `${player.name}`}). Seleziona chi votare o candidati tu stesso al Colle:
+        Nei primi 3 scrutini serve il quorum dei <strong>2/3 (267 voti)</strong>; dal <strong>4° scrutinio</strong> basta la <strong>maggioranza assoluta (201 voti)</strong> e i poli parlamentari convergono su un nome di garanzia.<br>
+        ${isIndependentWithoutSeats
+          ? `<strong>⚠️ NOTA COSTITUZIONALE (Art. 83 Cost.):</strong> Sei una personalità Indipendente esterna al Parlamento (<strong>0 Grandi Elettori</strong>). Non puoi inserire schede nell'urna, ma puoi rilasciare un <em>Endorsement Pubblico</em> per orientare i parlamentari d'area o candidarti tu stesso se hai compiuto 50 anni!`
+          : `Controlli direttamente <strong>${player.seats} grandi elettori</strong> (${game.partyRole === 'independent' ? 'Indipendente' : player.name}). Seleziona chi votare per il Colle:`
+        }
       `;
 
       const box = document.getElementById('mChoices');
@@ -1191,9 +1362,8 @@ export function openQuirinaleBallotModal(ballotNum = 1) {
         let baseVotes = baseSup.reduce((s,p) => s + p.seats, 0);
         let allies = [];
         if (cand.isPlayer) {
-          // I partiti affini o in buoni rapporti convergono sulla candidatura del giocatore in base al Prestigio e al numero di scrutinio
           const prestigeReach = 0.8 + (game.leader.prestige / 95) + (ballotNum >= 4 ? 0.55 : 0);
-          allies = game.parties.filter(p => p.id !== player.id && p.seats > 0 && ! getBetrayal(player.id, p.id) && (
+          allies = game.parties.filter(p => p.id !== player.id && p.seats > 0 && !getBetrayal(player.id, p.id) && (
             (player.coalId !== 'none' && p.coalId === player.coalId) ||
             (getPairRel(player.id, p.id) >= 55 && Math.abs(getPartyIdeoScore(p) - myIdeo) <= prestigeReach)
           ));
@@ -1201,42 +1371,29 @@ export function openQuirinaleBallotModal(ballotNum = 1) {
           const reach = 1.25 + (ballotNum >= 4 ? 0.65 : 0);
           allies = game.parties.filter(p => p.id !== player.id && p.seats > 0 && !baseSup.includes(p) && Math.abs(getPartyIdeoScore(p) - cand.idealIdeo) <= reach);
         }
+        const playerContributedSeats = isIndependentWithoutSeats ? 0 : player.seats;
         const prestigeVotes = cand.isPlayer ? Math.round(game.leader.prestige * 0.65) : Math.round((cand.trust || 75) * 0.45);
-        const estTotal = Math.min(385, baseVotes + allies.reduce((s,p)=>s+p.seats,0) + player.seats + prestigeVotes + convergenceBonus);
+        const estTotal = Math.min(385, baseVotes + allies.reduce((s,p)=>s+p.seats,0) + (cand.isPlayer ? playerContributedSeats : 0) + prestigeVotes + convergenceBonus);
         return { cand, baseSup, allies, estTotal };
       });
 
       const electWinner = (winnerCand, votes, noteTxt = '') => {
+        // Punto 7: Incompatibilità assoluta Art. 84 c. 2 Cost.
+        vacateOfficesForPresident(winnerCand.name);
+
         game.president.name = winnerCand.name;
         game.president.age = winnerCand.age;
         game.president.area = winnerCand.area;
         game.president.endDate = new Date(game.date.getFullYear() + 7, game.date.getMonth(), game.date.getDate());
         game.president.trust = winnerCand.trust || 85;
         game.president.isPlayer = !!winnerCand.isPlayer;
-        if (winnerCand.id === 'draghi') game.spread = Math.max(65, game.spread - 20);
+        if (winnerCand.id === 'draghi' || winnerCand.id === 'draghi_p') game.spread = Math.max(65, game.spread - 22);
 
-        // Punto 2 & 9 v6.2: Chi sale al Quirinale lascia ogni eventuale incarico di Governo o Presidenza di Camera/Senato (unicità delle cariche!)
         if (winnerCand.isPlayer) {
-          game.leader.prestige = Math.min(100, game.leader.prestige + 15);
-          if (game.currentPM === game.leader.name) {
-            const govPs = game.parties.filter(x => x.inGov).sort((a,b)=>b.seats-a.seats);
-            const nextLeader = (govPs[0] && govPs[0].leader !== game.leader.name) ? govPs[0].leader : (player.wingLeader || "Antonio Tajani");
-            game.currentPM = nextLeader;
-          }
-          MINISTRIES.forEach(m => {
-            if (game.cabinet[m.id] && (game.cabinet[m.id].isPlayer || game.cabinet[m.id].name === game.leader.name)) {
-              const repl = POLITICIANS.find(x => !getPersonCurrentOffice(x, m.id, false)) || POLITICIANS[0];
-              game.cabinet[m.id] = repl;
-            }
-          });
-          addFeed(`👑 <strong>STORICA FUMATA BIANCA AL ${ballotNum}° SCRUTINIO (${votes} voti)!</strong> <strong>${game.leader.name}</strong> è eletto <strong>Presidente della Repubblica Italiana</strong>! Ti insedi al Palazzo del Quirinale per i prossimi 7 anni (poteri presidenziali sbloccati nella scheda Parlamento & Colle)!`, 'ok');
+          game.leader.prestige = Math.min(100, game.leader.prestige + 16);
+          addFeed(`👑 <strong>STORICA FUMATA BIANCA AL ${ballotNum}° SCRUTINIO (${votes} voti)!</strong> <strong>${game.leader.name}</strong> è eletto <strong>Presidente della Repubblica Italiana</strong>! Ti insedi al Colle per il settennato (poteri sbloccati nella scheda Parlamento & Colle)!`, 'ok');
           setTicker(`HABEMUS PRAESIDENTEM: ${game.leader.name} eletto Presidente della Repubblica con ${votes} voti!`);
         } else {
-          MINISTRIES.forEach(m => {
-            if (game.cabinet[m.id]?.name === winnerCand.name) {
-              game.cabinet[m.id] = POLITICIANS.find(x => !getPersonCurrentOffice(x, m.id, false)) || POLITICIANS[0];
-            }
-          });
           addFeed(`🔔 <strong>FUMATA BIANCA AL ${ballotNum}° SCRUTINIO (${votes} voti)!</strong> <strong>${winnerCand.name} (${winnerCand.age}a)</strong> è eletto Presidente della Repubblica! ${noteTxt}`);
           setTicker(`QUIRINALE: ${winnerCand.name} eletto Presidente della Repubblica al ${ballotNum}° scrutinio (${votes} voti)!`);
         }
@@ -1248,8 +1405,12 @@ export function openQuirinaleBallotModal(ballotNum = 1) {
         const btn = document.createElement('button');
         btn.className = 'm-btn';
         btn.style.borderColor = cand.isPlayer ? 'var(--gold)' : '';
+        const actionLabel = isIndependentWithoutSeats
+          ? (cand.isPlayer ? `👑 CANDIDATI COME PERSONALITÀ INDIPENDENTE: ${cand.name}` : `📣 Endorsement Pubblico per ${cand.name}`)
+          : (cand.isPlayer ? `👑 CANDIDATI TU STESSO AL QUIRINALE: ${cand.name}` : `🗳️ Vota ${cand.name}`);
+
         btn.innerHTML = `
-          <strong>${cand.isPlayer ? `👑 CANDIDATI TU STESSO AL QUIRINALE: ${cand.name}` : `🗳️ Vota ${cand.name}`} (${cand.age}a, ${cand.area}) — Stima Voti: ~${estTotal} / ${quorum}</strong>
+          <strong>${actionLabel} (${cand.age}a, ${cand.area}) — Stima Voti: ~${estTotal} / ${quorum}</strong>
           <span>${cand.isPlayer ? `Grandi elettori convergenti: ${allies.map(p=>p.short).join(', ') || 'Trasversali'} — ${cand.desc}` : `Voti base: ${baseSup.map(p=>p.short).join(', ') || 'Trasversali'} ${allies.length ? `• Convergenza: +${allies.map(p=>p.short).join(', ')}` : ''} — ${cand.desc}`}</span>
         `;
         btn.onclick = () => {
@@ -1258,11 +1419,10 @@ export function openQuirinaleBallotModal(ballotNum = 1) {
           if (actual >= quorum) {
             electWinner(cand, actual);
           } else if (ballotNum >= 5) {
-            // Punto 7 & 8 v6.2: Al 5°-6° scrutinio il Parlamento trova sempre la quadra evitando qualsiasi loop infinito (anche da Indipendente con 0 seggi)!
             const bestAI = [...computedCands].sort((a,b) => b.estTotal - a.estTotal)[0];
             const winTarget = (cand.isPlayer && actual >= 175) ? cand : bestAI.cand;
             const winVotes = Math.max(quorum + 8, actual, bestAI.estTotal);
-            electWinner(winTarget, winVotes, "(Intesa raggiunta tra i grandi elettori in Aula)");
+            electWinner(winTarget, winVotes, "(Intesa trasversale raggiunta tra i grandi elettori in Aula)");
           } else {
             addFeed(`💨 <strong>Fumata Nera al ${ballotNum}° scrutinio:</strong> ${cand.name} ottiene ${actual} voti su ${quorum}. I capigruppo trattano per il ${ballotNum + 1}° scrutinio!`);
             openQuirinaleBallotModal(ballotNum + 1);
@@ -1273,11 +1433,11 @@ export function openQuirinaleBallotModal(ballotNum = 1) {
 
       const btnBlank = document.createElement('button');
       btnBlank.className = 'm-btn';
-      btnBlank.innerHTML = `<strong>🏳️ Scheda Bianca Tattica (${ballotNum >= 4 ? 'I partiti votano il candidato di compromesso' : `Passa al ${ballotNum + 1}° Scrutinio`})</strong>`;
+      btnBlank.innerHTML = `<strong>🏳️ ${isIndependentWithoutSeats ? 'Mantieni Neutralità Istituzionale' : 'Scheda Bianca Tattica'} (${ballotNum >= 4 ? 'I grandi elettori votano il candidato di compromesso' : `Passa al ${ballotNum + 1}° Scrutinio`})</strong>`;
       btnBlank.onclick = () => {
         if (ballotNum >= 4) {
           const bestAI = [...computedCands].filter(x => !x.cand.isPlayer).sort((a,b) => b.estTotal - a.estTotal)[0] || computedCands[0];
-          electWinner(bestAI.cand, Math.max(218, bestAI.estTotal), "(Eletto dai partiti parlamentari dopo la tua scheda bianca)");
+          electWinner(bestAI.cand, Math.max(218, bestAI.estTotal), "(Eletto dal Parlamento dopo la tua neutralità)");
         } else {
           openQuirinaleBallotModal(ballotNum + 1);
         }
@@ -1287,6 +1447,8 @@ export function openQuirinaleBallotModal(ballotNum = 1) {
     }
 
 export function triggerElections(reason) {
+      game.lastElectionTurn = game.turn;
+      game.legislature = (game.legislature || 19) + 1;
       game.parties.forEach(p => p.seats = 0);
       const coalMap = {};
       game.parties.forEach(p => {
@@ -1423,14 +1585,60 @@ export function triggerElections(reason) {
             if (playerInExp) openManualGovernmentFormationModal(expMems, topP.leader, winC.key);
             else { autoFormGovAI(expMems, topP.leader, winC.key); closeModal(); updateAllUI(); }
           } else {
-            autoFormGovAI(sortedP.slice(0,3), "Fabio Panetta (Tecnico)", "none");
-            game.nextElectionDate = new Date(game.date.getFullYear()+1, game.date.getMonth(), game.date.getDate());
+            formTechnicalGovernment(null, 'stabilità');
+            game.nextElectionDate = new Date(game.date.getFullYear()+2, game.date.getMonth(), game.date.getDate());
             closeModal(); updateAllUI();
           }
         };
         box.appendChild(btn);
       }
       openModal();
+    }
+
+    /* PUNTO 1: GOVERNO TECNICO DI SALVEZZA NAZIONALE (PREMIERATO TECNICO DI ALTO PROFILO) */
+export function formTechnicalGovernment(techId = null, priority = 'stabilità') {
+      const technocrats = POLITICIANS.filter(p => p.partyId === 'tech' && p.age >= 50);
+      const pmCandidate = (techId && technocrats.find(p => p.id === techId))
+        || technocrats.find(p => p.id === 'draghi_p')
+        || technocrats.find(p => p.id === 'panetta_p')
+        || technocrats.find(p => p.id === 'cottarelli_p')
+        || technocrats.find(p => p.id === 'cartabia_p')
+        || technocrats[0];
+
+      game.isTechnicalGov = true;
+      game.technocratPM = pmCandidate ? pmCandidate.id : 'draghi_p';
+      const cleanPmName = pmCandidate ? pmCandidate.name : 'Mario Draghi';
+      game.currentPM = `${cleanPmName} (Tecnico)`;
+      game.currentGovCoalId = 'none';
+      game.govPriority = priority;
+      game.govStability = 84;
+      game.spread = Math.max(65, game.spread - 25);
+      game.gdp = Math.min(3.5, +(game.gdp + 0.25).toFixed(2));
+
+      // I partiti moderati e istituzionali danno la fiducia esterna
+      const broadParties = game.parties.filter(p => ['fi','pd','az','iv','pru'].includes(p.id) || p.seats >= 35);
+      game.parties.forEach(p => {
+        p.inGov = broadParties.some(bp => bp.id === p.id);
+      });
+
+      // Nomina dei ministri con tecnici di assoluto prestigio
+      const techExperts = POLITICIANS.filter(p => p.partyId === 'tech' && (!pmCandidate || p.id !== pmCandidate.id));
+      const used = new Set([pmCandidate ? pmCandidate.id : 'draghi_p']);
+      setDraftCabinet({});
+      MINISTRIES.forEach(m => {
+        const expert = techExperts.find(x => !used.has(x.id) && x.pref === m.id)
+          || techExperts.find(x => !used.has(x.id))
+          || POLITICIANS.find(x => !used.has(x.id) && x.partyId === 'tech');
+        if (expert) {
+          game.cabinet[m.id] = expert;
+          used.add(expert.id);
+        }
+      });
+
+      addFeed(`🏛️ <strong>GOVERNO TECNICO DEL PRESIDENTE:</strong> Il Quirinale conferisce l'incarico a <strong>${cleanPmName}</strong> per guidare un Esecutivo di alto profilo istituzionale e salvezza nazionale! Lo Spread scende a ${game.spread} pt e la stabilità risale all'84%.`, 'ok');
+      setTicker(`GOVERNO TECNICO: Giuramento al Quirinale dell'Esecutivo presieduto da ${cleanPmName}!`);
+      closeModal();
+      updateAllUI();
     }
 
     /* PUNTI 2, 12, 16, 17 (v6.2): FORMAZIONE DEL GOVERNO A 15 MINISTERI CON UNICITÀ RIGOROSA DELLE CARICHE E NOMINA DEL GIOCATORE A MINISTRO SE ALLEATO DI COALIZIONE */
@@ -1817,9 +2025,25 @@ export function internalPartyAction(mode) {
     }
 
 export function joinPartyAsMember(targetId) {
+      if (game.inExile) {
+        alert("❌ SEI IN ESILIO ALL'ESTERO:\nNon puoi tesserarti in un partito italiano mentre sei ricercato o rifugiato all'estero! Richiedi prima l'amnistia o la riabilitazione al Quirinale.");
+        return;
+      }
       if (game.ap < 30) { alert("Servono 30 ⚡!"); return; }
       const target = game.parties.find(x => x.id === targetId);
       if (!target) return;
+
+      // Punto 20: Bussola Politica Personale e compatibilità statutaria
+      const myIdeo = game.leader.compass?.ideoScore ?? game.leader.personalIdeo ?? 2.0;
+      const targetIdeo = getPartyIdeoScore(target);
+      const ideoDist = Math.abs(myIdeo - targetIdeo);
+      if (ideoDist > 1.85) {
+        alert(`❌ TESSERAMENTO RESPINTO DALLA DIREZIONE NAZIONALE DI ${target.short.toUpperCase()}:\n` +
+              `La tua collocazione politica personale (${getIdeoLabel(myIdeo)}) è incompatibile con lo statuto di ${target.name} (${getIdeoLabel(targetIdeo)})!\n` +
+              `Distanza ideologica eccessiva (${ideoDist.toFixed(1)} pt). Rivedi le tue posizioni o rivolgiti a una forza politica affine.`);
+        return;
+      }
+
       if (!useTurnAction('join_party', 'Cambio di Partito')) return;
       game.ap -= 30;
 
@@ -1967,7 +2191,15 @@ export function launchIdeologicalConstituent() {
 
 export function setStance(key, idx) {
       const p = getP();
-      const cost = (game.partyRole === 'member') ? 20 : 12;
+      // Punto 13: Il programma ufficiale può essere modificato solo dal Segretario Nazionale!
+      if (game.partyRole === 'member') {
+        alert(`❌ PREROGATIVA STATUTARIA DI ${p.short}:\n` +
+              `Come semplice membro/militante non hai il potere statutario di modificare la linea del Programma Elettorale!\n` +
+              `Questa funzione appartiene esclusivamente al Segretario Nazionale (${p.leader}).\n` +
+              `Puoi sfidare il Segretario al prossimo Congresso Nazionale o promuovere una scissione per fondare un tuo movimento.`);
+        return;
+      }
+      const cost = 12;
       if (p.stances[key] === idx) return;
       if (game.ap < cost) { alert(`Servono ${cost} ⚡ di Capitale Politico!`); return; }
       if (!useTurnAction('stance_' + key, `Modifica Dossier ${key.toUpperCase()}`)) return;
@@ -2080,6 +2312,19 @@ export function proposeHotLawParliament(lawId, targetIdx, forceAgainstParty = fa
 
       const p = getP();
       const isInd = (game.partyRole === 'independent' || p.id === 'ind');
+
+      // Punti 14 & 15: Prerogativa parlamentare (Art. 71 Cost.) - servono seggi o carica esecutiva!
+      if (p.seats === 0 && game.currentPM !== game.leader.name && !getPlayerMinistry()) {
+        alert("❌ PREROGATIVA COSTITUZIONALE (Art. 71 Cost.):\n" +
+              "Non hai parlamentari a Montecitorio o al Senato (0 seggi) e non fai parte dell'Esecutivo!\n" +
+              "Non puoi presentare direttamente Disegni di Legge (DDL) in Aula.\n\n" +
+              "Strumenti civici a tua disposizione:\n" +
+              "• Raccolta firme per indire un Referendum Popolare (500.000 firme);\n" +
+              "• Proposta di Legge d'Iniziativa Popolare (50.000 firme certificate);\n" +
+              "• Pressione mediatica e mobilitazione pubblica.");
+        return;
+      }
+
       const dObj = DOSSIERS.find(d => d.key === law.dossier);
       const dTitle = dObj ? dObj.title : law.dossier.toUpperCase();
       const myPartyStance = isInd ? (game.personalStances[law.dossier] ?? 2) : (p.stances[law.dossier] ?? Math.round(getPartyIdeoScore(p)));
@@ -2411,6 +2656,24 @@ export function diploAct(targetId, mode) {
         addFeed(`⚔️ Duro scontro politico tra ${game.leader.name} e ${o.leader} (${o.short}): cala il feeling ma si compatta la base.`);
       } else if (mode === 'invite') {
         if (game.ap < 22) { alert("Servono 22 ⚡!"); return; }
+        const comp = computeCompat(p, o);
+        if (comp.vetoed) {
+          alert(`❌ INVITO RESPINTO: Tra ${p.short} e ${o.short} vige un veto insormontabile! Sigla prima un Patto di Disgelo.`);
+          return;
+        }
+        if (comp.score < 48) {
+          alert(`❌ INVITO RESPINTO: L'affinità programmatica tra ${p.short} e ${o.short} è insufficiente (${comp.score}%). Serve almeno il 48% di convergenza sui dossier chiave per federarsi.`);
+          return;
+        }
+        if (o.coalId !== 'none') {
+          const curLead = getCoalLeaderParty(o.coalId);
+          const curRel = curLead ? getPairRel(o.id, curLead.id) : 60;
+          const myRel = getPairRel(o.id, p.id);
+          if (curRel > myRel + 8 && (game.allySatisfaction[o.id] || 70) >= 50) {
+            alert(`❌ INVITO RESPINTO: ${o.leader} rifiuta l'invito: ${o.short} è fedele all'alleanza "${getCoalName(o.coalId)}" (Relazione con alleati: ${curRel} vs con te: ${myRel}). Riduci la compatibilità dei loro vertici o intensifica i contatti bilaterali prima di riprovare.`);
+            return;
+          }
+        }
         if (!useTurnAction(`diplo_invite_${targetId}`, `Patto di Coalizione con ${o.short}`)) return;
         game.ap -= 22;
         if (p.coalId === 'none') {
@@ -2977,21 +3240,51 @@ export function govVerifica() {
 
 export function openCrisis() {
       if (game.isImprisoned) return;
-      game.govStability = 12;
+      game.govStability = 10;
       addFeed(`💣 <strong>CRISI DI GOVERNO UFFICIALE:</strong> ${game.leader.name} apre formalmente la crisi a Palazzo Chigi! Il Presidente ${game.president.name} avvia le consultazioni al Quirinale.`);
+      
+      const p = getP();
+      const turnsSinceLastElec = game.turn - (game.lastElectionTurn || -999);
+      const canDissolve = !isSemestreBianco() && turnsSinceLastElec >= 26;
+
+      const choices = [
+        {
+          label: "🏛️ Consultazioni Politiche: Negozia un Nuovo Governo di Maggioranza",
+          fn: () => { closeModal(); openManualGovernmentFormationModal(game.parties.filter(x => x.coalId === p.coalId && x.seats > 0), game.leader.name, p.coalId); }
+        },
+        {
+          label: "🛡️ Governo Tecnico di Salvezza Nazionale (Incarico conferito a un Tecnico dal Quirinale)",
+          fn: () => { closeModal(); formTechnicalGovernment(null, 'stabilità'); }
+        }
+      ];
+
+      if (canDissolve) {
+        choices.push({
+          label: "🗳️ Extrema Ratio: Chiedi lo Scioglimento delle Camere ed Elezioni Anticipate (45g)",
+          fn: () => { closeModal(); startElectoralCampaign("Crisi di Governo aperta da " + game.leader.name); }
+        });
+      } else {
+        choices.push({
+          label: `🔒 Scioglimento Camere non praticabile (${isSemestreBianco() ? 'Semestre Bianco Art. 88 c.2 Cost.' : `Elezioni troppo recenti: ${turnsSinceLastElec}/26 settimane`})`,
+          fn: () => { alert("Il Capo dello Stato respinge lo scioglimento anticipato delle Camere per ragioni costituzionali e di stabilità."); }
+        });
+      }
+
       openModal(
         "🏛️ Consultazioni al Quirinale — Crisi di Governo",
-        `<p>Hai aperto formalmente la crisi di governo. Il Capo dello Stato <strong>${game.president.name}</strong> ti convoca al Quirinale: quale soluzione proponi?</p>`,
-        [
-          { label: "🏛️ Componi Manualmente un Nuovo Governo in Parlamento", fn: () => { closeModal(); openManualGovernmentFormationModal(game.parties.filter(x => x.coalId === getP().coalId), game.leader.name, getP().coalId); } },
-          { label: "🗳️ Chiedi lo Scioglimento delle Camere ed Elezioni Anticipate (45g di campagna)", fn: () => { closeModal(); startElectoralCampaign("Crisi di Governo aperta da " + game.leader.name); } }
-        ]
+        `<p>Hai aperto formalmente la crisi di governo. Il Capo dello Stato <strong>${game.president.name}</strong> avvia le consultazioni istituzionali al Colle per trovare una soluzione allo stallo:</p>`,
+        choices
       );
       updateAllUI();
     }
 
 export function oppHearing() {
       if (game.isImprisoned) return;
+      const p = getP();
+      if (p.seats === 0) {
+        alert("❌ NESSUN SEGGIO IN PARLAMENTO:\nNon hai deputati a Montecitorio (0 seggi)!\nIl Question Time e le interrogazioni a risposta immediata sono riservate ai parlamentari eletti.\nUsa i comizi territoriali e i social media per fare opposizione civica.");
+        return;
+      }
       if (game.ap < 15) { alert("Servono 15 ⚡!"); return; }
       if (!useTurnAction('opp_hearing', 'Question Time a Montecitorio')) return;
       game.ap -= 15;
@@ -3004,6 +3297,11 @@ export function oppHearing() {
 
 export function oppFilibuster() {
       if (game.isImprisoned) return;
+      const p = getP();
+      if (p.seats === 0) {
+        alert("❌ NESSUN SEGGIO IN PARLAMENTO:\nNon hai deputati nelle Commissioni parlamentari (0 seggi)!\nL'ostruzionismo tecnico richiede di depositare sub-emendamenti d'Aula da parte di eletti.");
+        return;
+      }
       if (game.ap < 20) { alert("Servono 20 ⚡!"); return; }
       if (!useTurnAction('opp_filibuster', 'Ostruzionismo in Commissione Bilancio')) return;
       game.ap -= 20;
@@ -3012,14 +3310,17 @@ export function oppFilibuster() {
       updateAllUI();
     }
 
-    /* PUNTO 15 (v6.2): ESITO COSTITUZIONALMENTE REALISTICO DELLA MOZIONE DI SFIDUCIA DALL'OPPOSIZIONE!
-       Se sei all'opposizione e fai cadere il Governo, NON scegli arbitrariamente di formare un tuo governo se non hai i numeri (>= 201 seggi) in Parlamento! */
+    /* PUNTI 1, 5, 14 & 15: MOZIONE DI SFIDUCIA CON REQUISITO DEI SEGGI, GOVERNO TECNICO E PREVENZIONE LIMBO ELEZIONI */
 export function tableSfiducia() {
       if (game.isImprisoned) return;
+      const p = getP();
+      if (p.seats === 0) {
+        alert("❌ PREROGATIVA COSTITUZIONALE (Art. 94 Cost.):\nNon hai deputati a Montecitorio (0 seggi)!\nAi sensi della Costituzione, la mozione di sfiducia deve essere sottoscritta da almeno un decimo dei componenti della Camera (almeno 40 deputati). Non può essere presentata da forze extra-parlamentari.");
+        return;
+      }
       if (game.ap < 30) { alert("Servono 30 ⚡!"); return; }
       if (!useTurnAction('table_sfiducia', 'Mozione di Sfiducia al Governo')) return;
       game.ap -= 30;
-      const p = getP();
       const oppSeats = game.parties.filter(x => !x.inGov).reduce((s,x)=>s+x.seats, 0);
       const passChance = (game.govStability < 38 ? 0.55 : (game.govStability < 52 ? 0.25 : 0.08)) + (oppSeats >= 195 ? 0.25 : 0);
 
@@ -3057,17 +3358,21 @@ export function tableSfiducia() {
             ]
           );
         } else {
-          // Caso realistico standard (Punto 15): l'opposizione ha meno di 201 seggi (sono stati decisivi i franchi tiratori), quindi NON può auto-nominarsi al governo senza passare dalle elezioni!
+          // Punti 1 & 5: L'opposizione non ha 201 seggi -> Il Quirinale apre a un Governo Tecnico per evitare il limbo elettorale a catena!
           openModal(
-            `⚖️ Cade il Governo ${fallenPM} — Il Quirinale Scioglie le Camere (Art. 88 Cost.)`,
+            `⚖️ Cade il Governo ${fallenPM} — Consultazioni al Quirinale`,
             `<div style="font-size:13px; color:var(--text);">
-              Colpo di scena a Montecitorio! Grazie ai franchi tiratori nella maggioranza, la tua mozione di sfiducia è passata e il Presidente del Consiglio <strong>${fallenPM}</strong> è salito al Quirinale per rassegnare le dimissioni (+8% tuo Prestigio Personale).<br><br>
-              Poiché in Parlamento i partiti d'opposizione compatibili dispongono di soli <strong>${altSeats} seggi su 400</strong> (sotto la maggioranza assoluta di 201 deputati), <strong>non esiste alcuna maggioranza parlamentare alternativa</strong>.<br><br>
-              Ai sensi dell'<strong>Art. 88 della Costituzione</strong>, il Presidente della Repubblica <strong>${game.president.name}</strong> decreta lo <strong>scioglimento anticipato delle Camere</strong> e indice le Elezioni Politiche tra 45 giorni!
+              Colpo di scena a Montecitorio! Grazie ai franchi tiratori nella maggioranza, la tua mozione di sfiducia è passata e il Presidente del Consiglio <strong>${fallenPM}</strong> rassegna le dimissioni (+8% tuo Prestigio Personale).<br><br>
+              In Parlamento i partiti d'opposizione compatibili dispongono di <strong>${altSeats} seggi su 400</strong> (sotto la maggioranza assoluta di 201 deputati).<br>
+              Per scongiurare l'instabilità e un limbo elettorale continuo, il Capo dello Stato <strong>${game.president.name}</strong> propone la nascita di un <strong>Governo Tecnico del Presidente</strong> oppure lo scioglimento anticipato:
             </div>`,
             [
               {
-                label: "🗳️ Prendi atto del Decreto del Quirinale: Vai alla Campagna Elettorale (45 giorni)!",
+                label: "🛡️ Incarico a un Governo Tecnico di Salvezza Nazionale (Mario Draghi / Fabio Panetta)",
+                fn: () => { closeModal(); formTechnicalGovernment(null, 'stabilità'); }
+              },
+              {
+                label: "🗳️ Extrema Ratio: Scioglimento delle Camere ed Elezioni Anticipate (45 giorni)",
                 fn: () => { closeModal(); startElectoralCampaign(`Scioglimento delle Camere dopo la sfiducia al Governo ${fallenPM}!`); }
               }
             ]
@@ -3353,10 +3658,65 @@ export function quirinalePlayerAction(mode) {
         return;
       } else if (mode === 'dissolve') {
         if (game.ap < 35) { alert("Servono 35 ⚡!"); return; }
+        // Punto 2: Limiti costituzionali Art. 88 Cost.
+        if (isSemestreBianco()) {
+          alert("❌ IMPEDIMENTO COSTITUZIONALE (Art. 88 comma 2 Cost.):\n" +
+                "Il Presidente della Repubblica non può sciogliere le Camere negli ultimi 6 mesi del suo mandato presidenziale (Semestre Bianco), salvo che essi coincidano in tutto o in parte con gli ultimi 6 mesi della legislatura!");
+          return;
+        }
+        const govSeats = game.parties.filter(p => p.inGov).reduce((s,p) => s + p.seats, 0);
+        if (govSeats >= 201 && game.govStability > 40) {
+          alert(`❌ PREROGATIVA COSTITUZIONALE (Art. 88 Cost.):\n` +
+                `Il Governo in carica gode del sostegno di una maggioranza parlamentare solida (${govSeats} seggi su 400, Stabilità: ${game.govStability}%).\n` +
+                `Il Presidente della Repubblica non può sciogliere arbitrariamente un Parlamento che esprime un Esecutivo con la piena fiducia delle Camere!\n` +
+                `Lo scioglimento anticipato è un potere di garanzia che presuppone una paralisi parlamentare o una crisi insanabile.`);
+          return;
+        }
         if (!useTurnAction('q_dissolve', 'Scioglimento delle Camere')) return;
         game.ap -= 35;
         startElectoralCampaign(`Decreto di scioglimento anticipato delle Camere firmato dal Presidente della Repubblica ${game.leader.name} (Art. 88 Cost.)!`);
         return;
+      }
+      updateAllUI();
+    }
+
+    /* PUNTO 22: AZIONI DI ESILIO ESTERO PER IL GIOCATORE LATITANTE / RIFUGIATO */
+export function exileAction(mode) {
+      if (!game.inExile) return;
+      if (mode === 'broadcast') {
+        if (game.ap < 15) { alert("Servono 15 ⚡!"); return; }
+        if (!useTurnAction('exile_broadcast', 'Comizio Clandestino')) return;
+        game.ap -= 15;
+        game.leader.prestige = Math.min(100, game.leader.prestige + 4);
+        if (game.isDictatorship) game.revoltRisk = Math.min(98, game.revoltRisk + 8);
+        addFeed(`📻 <strong>COMUNICATO CLANDESTINO DALL'ESTERO:</strong> Da <strong>${game.exileHost || 'esilio estero'}</strong>, <strong>${game.leader.name}</strong> trasmette un discorso a reti unificate via web (+4% Prestigio${game.isDictatorship ? ', +8% Rischio Rivolta in Italia' : ''})!`, 'ok');
+      } else if (mode === 'diaspora') {
+        if (game.ap < 18) { alert("Servono 18 ⚡!"); return; }
+        if (!useTurnAction('exile_diaspora', 'Raccolta Fondi Diaspora')) return;
+        game.ap -= 18;
+        game.funds += 40;
+        addFeed(`💰 <strong>SOSTEGNO DELLA DIASPORA:</strong> Grande raccolta fondi tra gli emigrati e gli esuli politici: entrano <strong>€ 40k</strong> nelle casse della tua causa!`, 'ok');
+      } else if (mode === 'diplomacy') {
+        if (game.ap < 22) { alert("Servono 22 ⚡!"); return; }
+        if (!useTurnAction('exile_diplomacy', 'Udienza Diplomatica')) return;
+        game.ap -= 22;
+        game.leader.prestige = Math.min(100, game.leader.prestige + 5);
+        const host = (game.exileHost || '').includes('Russia') ? 'russia' : ((game.exileHost || '').includes('Pechino') ? 'china' : 'usa');
+        if (game.foreignRels[host]) game.foreignRels[host] = Math.min(100, game.foreignRels[host] + 12);
+        addFeed(`🏛️ <strong>INCONTRO AL VERTICE INTERNAZIONALE:</strong> I vertici governativi di <strong>${game.exileHost || 'Paese Ospitante'}</strong> ti accolgono con gli onori di leader dell'opposizione (+5% Prestigio, +12 Relazione diplomatica)!`);
+      } else if (mode === 'amnesty') {
+        if (game.ap < 35) { alert("Servono 35 ⚡!"); return; }
+        if (game.president.trust < 60 && game.leader.prestige < 65) {
+          alert(`❌ ISTANZA D'AMNISTIA NON ACCOLTA:\nIl Quirinale e il Ministero della Giustizia richiedono almeno il 60% di Fiducia al Colle (attuale: ${game.president.trust}%) o il 65% di Prestigio Personale (attuale: ${game.leader.prestige}%) per concedere la riabilitazione giuridica.`);
+          return;
+        }
+        if (!useTurnAction('exile_amnesty', 'Istanza di Amnistia al Quirinale')) return;
+        game.ap -= 35;
+        game.inExile = false;
+        game.exileHost = null;
+        game.leader.prestige = Math.min(100, game.leader.prestige + 8);
+        addFeed(`🕊️ <strong>DECRETO DI AMNISTIA E RIABILITAZIONE:</strong> Il Presidente ${game.president.name} firma il decreto di amnistia e riabilitazione costituzionale! <strong>${game.leader.name}</strong> torna liberamente in Italia e può riprendere l'attività politica parlamentare!`, 'ok');
+        setTicker(`RIENTRO DALL'ESILIO: Amnistia per ${game.leader.name}, rientro trionfale in Italia!`);
       }
       updateAllUI();
     }
