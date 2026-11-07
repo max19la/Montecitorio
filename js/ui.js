@@ -620,42 +620,43 @@ export function renderLawsTab() {
             const myPartyStance = isInd ? (game.personalStances[law.dossier] ?? 2) : (p.stances[law.dossier] ?? Math.round(getPartyIdeoScore(p)));
 
             return `
-              <div class="law-card">
-                <div class="law-card-head">
+              <div class="law-card" style="background:rgba(15,23,42,0.75); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:14px; box-shadow:0 8px 24px rgba(0,0,0,0.35);">
+                <div class="law-card-head" style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
                   <div>
-                    <div style="font-size:13.5px; font-weight:800; color:#fff;">${law.title}</div>
-                    <div style="font-size:10.5px; color:var(--muted);">
-                      Dossier: <strong>${dTitle}</strong> • Linea ${isInd ? 'Personale' : `Programma ${p.short}`}: <strong style="color:var(--gold-lt);">${STANCE_LABELS[myPartyStance].short}</strong>
+                    <div style="font-size:14px; font-weight:800; color:#fff;">${law.title}</div>
+                    <div style="font-size:11px; color:var(--muted); margin-top:2px;">
+                      Dossier: <strong style="color:#38bdf8;">${dTitle}</strong> • Linea ${isInd ? 'Personale' : `Programma ${p.short}`}: <strong style="color:var(--gold-lt);">${STANCE_LABELS[myPartyStance].short}</strong>
                       ${lawCdLeft > 0 ? ` • <span style="color:#f59e0b; font-weight:800;">⏳ Moratoria Aula: ${lawCdLeft}g</span>` : ''}
                       ${refCdLeft > 0 ? ` • <span style="color:#f87171; font-weight:800;">🔒 Vincolo Ref.: ${refCdLeft}g</span>` : ''}
                     </div>
                   </div>
-                  <span class="law-status-pill" style="background:rgba(255,255,255,0.06); color:${stColor}; border:1px solid ${stColor}66;">
-                    ${curOpt.status}
+                  <span class="law-status-pill" style="background:rgba(255,255,255,0.06); color:${stColor}; border:1px solid ${stColor}66; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:800;">
+                    VIGENTE
                   </span>
                 </div>
-                <div style="font-size:12px; color:var(--text); background:rgba(8,13,24,0.75); padding:8px 10px; border-radius:7px; border-left:3px solid ${stColor};">
-                  <strong>Normativa vigente in Italia:</strong> ${curOpt.label.replace(/^Stato attuale:\s*/i, '').replace(/^Proibizionismo attuale:\s*/i, '')}
+                <div style="font-size:12px; color:var(--text); background:rgba(8,13,24,0.85); padding:10px 12px; border-radius:8px; border-left:3px solid ${stColor}; margin-bottom:12px;">
+                  <div style="font-size:11px; font-weight:800; color:${stColor}; margin-bottom:2px;">⚖️ NORMATIVA VIGENTE IN ITALIA: ${curOpt.status.replace(/^[🟢🟡🔴]\s*/, '')}</div>
+                  <div>${curOpt.label.replace(/^Stato attuale:\s*/i, '').replace(/^Proibizionismo attuale:\s*/i, '')}</div>
                 </div>
-                <div style="font-size:11px; color:var(--gold-lt); font-weight:700; margin-top:4px;">
-                  ${game.isDictatorship ? 'Imponi nuova legge per Decreto del Regime:' : 'Proponi Riforma Legislativa (in linea col Programma) o Referendum (30g campagna):'}
+                <div style="font-size:11px; color:var(--gold-lt); font-weight:800; letter-spacing:0.5px; margin-bottom:8px;">
+                  ${game.isDictatorship ? '⚡ IMPONI MODIFICA PER DECRETO DITTATORIALE:' : '🏛️ PROPOSTE DI RIFORMA PARLAMENTARE O REFERENDUM POPOLARE:'}
                 </div>
-                <div style="display:flex; flex-direction:column; gap:6px;">
+                <div style="display:flex; flex-direction:column; gap:8px;">
                   ${law.options.filter(o => o.idx !== curIdx).map(opt => {
                     const targetStance = opt.targetStance ?? 2;
                     const myDist = Math.abs(myPartyStance - targetStance);
-                    const cleanOptStatus = opt.status.replace(/\s*\(Stato attuale\)|\s*\(Vigente\)/gi, '');
+                    const cleanOptStatus = opt.status.replace(/\s*\(Stato attuale\)|\s*\(Vigente\)/gi, '').replace(/^[🟢🟡🔴]\s*/, '');
                     const cleanOptLabel = opt.label.replace(/^Stato attuale:\s*/i, '').replace(/^Proibizionismo attuale:\s*/i, '');
                     const alignBadge = myDist === 0
-                      ? `<div style="font-size:10.5px; color:#34d399; font-weight:800; margin-top:2px;">✅ In Piena Linea col Programma ${isInd ? 'Personale' : `di ${p.short}`} (${STANCE_LABELS[targetStance].short})</div>`
+                      ? `<div style="font-size:10.5px; color:#34d399; font-weight:800; margin-top:3px;">✅ In Piena Linea col Programma ${isInd ? 'Personale' : `di ${p.short}`} (${STANCE_LABELS[targetStance].short})</div>`
                       : (myDist === 1
-                        ? `<div style="font-size:10.5px; color:#fde047; font-weight:800; margin-top:2px;">⚖️ Compatibile col Programma ${isInd ? 'Personale' : `di ${p.short}`} (${STANCE_LABELS[targetStance].short})</div>`
-                        : `<div style="font-size:10.5px; color:#f87171; font-weight:800; margin-top:2px;">⛔ Contrario al Programma vigente ${isInd ? 'Personale' : `di ${p.short}`} (Richiede ${STANCE_LABELS[targetStance].short})</div>`);
+                        ? `<div style="font-size:10.5px; color:#fde047; font-weight:800; margin-top:3px;">⚖️ Compatibile col Programma ${isInd ? 'Personale' : `di ${p.short}`} (${STANCE_LABELS[targetStance].short})</div>`
+                        : `<div style="font-size:10.5px; color:#f87171; font-weight:800; margin-top:3px;">⛔ Contrario al Programma vigente ${isInd ? 'Personale' : `di ${p.short}`} (Richiede ${STANCE_LABELS[targetStance].short})</div>`);
                     return `
-                    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; background:rgba(255,255,255,0.03); border:1px solid ${myDist >= 2 && !isInd ? 'rgba(239,68,68,0.35)' : 'var(--bd)'}; border-radius:7px; padding:7px 9px; flex-wrap:wrap;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; background:rgba(255,255,255,0.03); border:1px solid ${myDist >= 2 && !isInd ? 'rgba(239,68,68,0.35)' : 'var(--bd)'}; border-radius:8px; padding:9px 11px; flex-wrap:wrap;">
                       <div style="flex:1; min-width:170px;">
-                        <div style="font-size:11.5px; font-weight:800; color:var(--gold-lt);">${cleanOptStatus}</div>
-                        <div style="font-size:11px; color:var(--muted);">${cleanOptLabel}</div>
+                        <div style="font-size:11.5px; font-weight:800; color:#fff;"><span class="badge" style="background:rgba(56,189,248,0.15); color:#38bdf8; font-size:10px; margin-right:4px;">RIFORMA</span> ${cleanOptStatus}</div>
+                        <div style="font-size:11px; color:var(--muted); margin-top:3px;">${cleanOptLabel}</div>
                         ${alignBadge}
                       </div>
                       <div style="display:flex; gap:5px; flex-wrap:wrap;">
@@ -783,13 +784,22 @@ export function renderCoalTab() {
                   : `Membri del tuo Polo: <strong>${coalMembers.map(m=>m.short).join(' • ')}</strong> — Consenso Totale: <strong style="color:#34d399;">${coalPollSum.toFixed(1)}%</strong> (<strong>${coalSeatsSum} seggi</strong> su 400) • Leader Coalizione: <strong>${coalLead ? coalLead.leader + ' (' + coalLead.short + ')' : p.leader}</strong>.`}
               </p>
             </div>
-            ${!isInd && !game.isImprisoned ? `
+            ${!isInd && !game.isImprisoned ? (() => {
+              const cLeader = p.coalId !== 'none' ? getCoalLeaderParty(p.coalId) : null;
+              const isLeader = !cLeader || cLeader.id === p.id;
+              return `
               <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-                <input type="text" id="customCoalInput" value="${curCoalName}" placeholder="Nome coalizione..." style="width:185px; padding:6px 10px; font-size:12px;" />
-                <button class="btn btn-w" onclick="renamePlayerCoalition()">✏️ ${p.coalId==='none'?'Fonda Polo':'Rinomina Polo'}</button>
+                ${isLeader ? `
+                  <input type="text" id="customCoalInput" value="${curCoalName}" placeholder="Nome coalizione..." style="width:185px; padding:6px 10px; font-size:12px;" />
+                  <button class="btn btn-w" onclick="renamePlayerCoalition()">✏️ ${p.coalId==='none'?'Fonda Polo':'Rinomina Polo'}</button>
+                ` : `
+                  <span class="badge" style="background:rgba(255,255,255,0.06); color:var(--text-muted); font-size:11px; padding:6px 10px; border-radius:6px; border:1px solid var(--bd);">
+                    🔒 Capofila: <strong>${cLeader ? cLeader.name : 'Alleato'}</strong> (${cLeader ? cLeader.poll.toFixed(1) : ''}%) — Solo il capofila può rinominare
+                  </span>
+                `}
                 ${p.coalId !== 'none' ? `<button class="btn btn-r" onclick="leaveCurrentCoalition()">🚪 Esci dal Polo</button>` : ''}
-              </div>
-            ` : ''}
+              </div>`;
+            })() : ''}
           </div>
 
           ${!isInd && !game.isImprisoned ? `
@@ -1030,7 +1040,7 @@ export function renderMinTab() {
 
         <div class="grid3">
           ${MINISTRIES.map(m => {
-            const cur = game.cabinet[m.id] || POLITICIANS[0];
+            const cur = game.cabinet[m.id] || { id: `vacant_${m.id}`, name: `Vacante (Interim ${m.name})`, age: '--', competence: 75, comp: 75, partyId: 'tech' };
             const mp = game.parties.find(x => x.id === cur.partyId);
             const isMe = (cur.isPlayer || cur.name === game.leader.name);
             const canReplaceThis = !game.isImprisoned && p.inGov && (isPlayerPM || cur.partyId === game.playerPartyId);
@@ -1916,9 +1926,16 @@ export function openPoliticianCardModal(polId) {
   const partyName = pt ? `${pt.name} (${pt.short})` : (target.partyId === 'tech' ? 'Tecnico Indipendente' : 'Indipendente');
   const curOffice = getPersonCurrentOffice(target.name) || 'Nessun dicastero (Membro dell\'Assemblea)';
 
-  const compass = target.compass || { economic: 0.0, social: 0.0, ideoScore: 2.0 };
-  const econ = Math.max(-2.0, Math.min(2.0, compass.economic !== undefined ? compass.economic : 0.0));
-  const soc = Math.max(-2.0, Math.min(2.0, compass.social !== undefined ? compass.social : 0.0));
+  let rawEcon = 0.0, rawSoc = 0.0;
+  if (Array.isArray(target.ideo) && target.ideo.length >= 2) {
+    rawEcon = target.ideo[0];
+    rawSoc = target.ideo[1];
+  } else if (target.compass) {
+    rawEcon = target.compass.economic ?? 0.0;
+    rawSoc = target.compass.social ?? 0.0;
+  }
+  const econ = Math.max(-2.0, Math.min(2.0, rawEcon));
+  const soc = Math.max(-2.0, Math.min(2.0, rawSoc));
   const svgX = 120 + (econ / 2.0) * 95;
   const svgY = 120 - (soc / 2.0) * 95;
 
@@ -1996,17 +2013,17 @@ export function openPoliticianCardModal(polId) {
           <div style="margin-bottom:6px;">
             <div style="display:flex; justify-content:space-between; font-size:10.5px; margin-bottom:2px;">
               <span>Competenza Governativa</span>
-              <strong>${target.comp || 75}/100</strong>
+              <strong>${target.competence || target.comp || 75}/100</strong>
             </div>
-            <div class="p-bar" style="height:6px;"><div class="p-fill" style="width:${target.comp || 75}%; background:#38bdf8;"></div></div>
+            <div class="p-bar" style="height:6px;"><div class="p-fill" style="width:${target.competence || target.comp || 75}%; background:#38bdf8;"></div></div>
           </div>
 
           <div style="margin-bottom:6px;">
             <div style="display:flex; justify-content:space-between; font-size:10.5px; margin-bottom:2px;">
-              <span>Clout & Influenza Politica</span>
-              <strong>${target.clout || 70}/100</strong>
+              <span>Prestigio & Clout Politico</span>
+              <strong>${target.prestige || target.clout || 70}/100</strong>
             </div>
-            <div class="p-bar" style="height:6px;"><div class="p-fill" style="width:${target.clout || 70}%; background:#f59e0b;"></div></div>
+            <div class="p-bar" style="height:6px;"><div class="p-fill" style="width:${target.prestige || target.clout || 70}%; background:#f59e0b;"></div></div>
           </div>
 
           <div>

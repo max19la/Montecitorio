@@ -55,7 +55,8 @@ import {
   setBetrayal,
   getBetrayal,
   recalcDynamicVetoes,
-  fmtDate
+  fmtDate,
+  recordPoliticianHistory
 } from './state.js';
 
 // Safe UI bridge delegators
@@ -224,16 +225,21 @@ export function initAllPairRelationsAndCabinet() {
       });
       setBetrayal('lega', 'fn', 1460, "Scissione di Futuro Nazionale dalla Lega");
       const initM = {
-        mef:'giorgetti', interni:'piantedosi', esteri:'tajani', difesa:'crosetto', giustizia:'nordio',
-        mimit:'urso', lavoro:'calderone', salute:'schillaci', mit:'salvini', mase:'pichetto',
-        mim:'valditara', cultura:'giuli', mur:'bernini', turismo:'santanche', agricoltura:'lollobrigida'
+        mef:'giorgetti_p', interni:'piantedosi', esteri:'tajani_p', difesa:'crosetto', giustizia:'nordio',
+        mimit:'urso', lavoro:'calderone', salute:'schillaci', mit:'salvini_p', mase:'pichetto',
+        mim:'valditara', cultura:'giuli_p', mur:'bernini', turismo:'santanche', agricoltura:'lollobrigida'
       };
-      MINISTRIES.forEach(m => { game.cabinet[m.id] = POLITICIANS.find(x => x.id === initM[m.id]) || POLITICIANS[0]; });
+      MINISTRIES.forEach(m => {
+        const found = POLITICIANS.find(x => x.id === initM[m.id]);
+        game.cabinet[m.id] = found ? { ...found } : { id:`fallback_${m.id}`, name:`Ministro (${m.name})`, partyId:'tech', competence:80 };
+      });
       game.senateSpeaker = POLITICIANS.find(x => x.id === 'larussa') || { id:'larussa', name:'Ignazio La Russa', age:79, partyId:'fdi' };
       game.chamberSpeaker = POLITICIANS.find(x => x.id === 'fontana_l') || { id:'fontana_l', name:'Lorenzo Fontana', age:46, partyId:'lega' };
-      // Punto 17 v6.2: se il giocatore guida un partito minore della coalizione di Governo ed è un leader custom (non ancora Ministro né Premier), riceve un dicastero di coalizione!
+
+      // Se il giocatore guida un partito minore della coalizione di Governo ed è un leader custom (non Premier), riceve un dicastero di coalizione
       const pStart = getP();
-      if (pStart && pStart.id !== 'ind' && pStart.inGov && game.currentPM !== game.leader.name && !getPlayerMinistry()) {
+      const isPremier = (game.currentPM === game.leader.name || game.currentPM === `${game.leader.name} (Tecnico)`);
+      if (pStart && pStart.id !== 'ind' && pStart.inGov && !isPremier && !getPlayerMinistry()) {
         const plPol = ensurePlayerInPoliticians();
         const targetMinId = pStart.id === 'fi' ? 'esteri' : (pStart.id === 'lega' ? 'mit' : (pStart.id === 'nm' ? 'mur' : 'turismo'));
         if (plPol) game.cabinet[targetMinId] = plPol;
@@ -621,8 +627,15 @@ export function nextTurns(days) {
             if (daysLeft <= 45) {
               startElectoralCampaign("Scadenza naturale della Legislatura a 45 giorni.");
             } else if (game.govStability <= 0) {
-              game.govStability = 40;
-              startElectoralCampaign("Crollo della maggioranza a Montecitorio!");
+              // Prevenzione limbo elezioni mensili: consultazioni al Quirinale e Governo Tecnico / Unità Nazionale
+              const techPremier = POLITICIANS.find(p => p.partyId === 'tech' && p.age >= 60 && ['draghi_p','franco_p','cartabia_p','panetta_p'].includes(p.id))
+                               || { name: 'Mario Draghi', id: 'draghi_p' };
+              const oldGovPM = game.currentPM;
+              game.currentPM = `${techPremier.name} (Governo Tecnico)`;
+              game.govStability = 75;
+              game.spread = Math.max(70, game.spread - 15);
+              addFeed(`🏛️ <strong>GOVERNO TECNICO AL QUIRINALE:</strong> A seguito della crisi del Governo ${oldGovPM}, il Presidente della Repubblica affida l'incarico a <strong>${techPremier.name}</strong> alla guida di un esecutivo di salvezza nazionale, scongiurando elezioni anticipate immediate!`, 'ok');
+              setTicker(`QUIRINALE: Nominato ${techPremier.name} Premier Tecnico di Unità Nazionale.`);
             }
           }
         }
@@ -1222,15 +1235,14 @@ export function triggerWorldEvent() {
         allowedRoles = ['party_member', 'gov_ally'];
       }
 
-      // Privilegia strettamente gli eventi specifici per il ruolo effettivo del giocatore!
+      // Filtra rigorosamente solo ed esclusivamente per il ruolo effettivo del giocatore!
       let pool = WORLD_EVENTS.filter(e => !game.seenEvents.has(e.id) && allowedRoles.includes(e.role));
       if (pool.length === 0) {
-        pool = WORLD_EVENTS.filter(e => !game.seenEvents.has(e.id) && (allowedRoles.includes(e.role) || e.role === 'any'));
+        // Resetta i visti unicamente per il ruolo del giocatore, evitando di mostrare eventi di altri ruoli
+        WORLD_EVENTS.filter(e => allowedRoles.includes(e.role)).forEach(e => game.seenEvents.delete(e.id));
+        pool = WORLD_EVENTS.filter(e => allowedRoles.includes(e.role));
       }
-      if (pool.length === 0) {
-        game.seenEvents.clear();
-        pool = WORLD_EVENTS.filter(e => allowedRoles.includes(e.role) || e.role === 'any');
-      }
+      if (pool.length === 0) return;
       const ev = pool[Math.floor(Math.random() * pool.length)];
       if (!ev) return;
       game.seenEvents.add(ev.id);
@@ -1389,9 +1401,13 @@ export function openQuirinaleBallotModal(ballotNum = 1) {
         game.president.isPlayer = !!winnerCand.isPlayer;
         if (winnerCand.id === 'draghi' || winnerCand.id === 'draghi_p') game.spread = Math.max(65, game.spread - 22);
 
+        recordPoliticianHistory(winnerCand.name, `Eletto Presidente della Repubblica Italiana (${ballotNum}° scrutinio, ${votes} voti)`);
+
         if (winnerCand.isPlayer) {
+          game.partyRole = 'president_rep';
+          game.president.isPlayer = true;
           game.leader.prestige = Math.min(100, game.leader.prestige + 16);
-          addFeed(`👑 <strong>STORICA FUMATA BIANCA AL ${ballotNum}° SCRUTINIO (${votes} voti)!</strong> <strong>${game.leader.name}</strong> è eletto <strong>Presidente della Repubblica Italiana</strong>! Ti insedi al Colle per il settennato (poteri sbloccati nella scheda Parlamento & Colle)!`, 'ok');
+          addFeed(`👑 <strong>STORICA FUMATA BIANCA AL ${ballotNum}° SCRUTINIO (${votes} voti)!</strong> <strong>${game.leader.name}</strong> è eletto <strong>Presidente della Repubblica Italiana</strong>! Ti insedi al Colle per il settennato da Capo dello Stato super partes (poteri presidenziali sbloccati nella scheda Parlamento & Colle)!`, 'ok');
           setTicker(`HABEMUS PRAESIDENTEM: ${game.leader.name} eletto Presidente della Repubblica con ${votes} voti!`);
         } else {
           addFeed(`🔔 <strong>FUMATA BIANCA AL ${ballotNum}° SCRUTINIO (${votes} voti)!</strong> <strong>${winnerCand.name} (${winnerCand.age}a)</strong> è eletto Presidente della Repubblica! ${noteTxt}`);
@@ -2604,10 +2620,16 @@ export function renamePlayerCoalition() {
         const cid = 'coal_' + p.id;
         game.coalitions[cid] = { id: cid, name: newName };
         p.coalId = cid;
+        addFeed(`🤝 <strong>NUOVA COALIZIONE:</strong> ${game.leader.name} fonda la coalizione <strong>"${newName}"</strong>!`, 'ok');
       } else if (game.coalitions[p.coalId]) {
+        const leader = getCoalLeaderParty(p.coalId);
+        if (leader && leader.id !== p.id) {
+          openModal("Azione non consentita", `<p>Soltanto il partito capofila della coalizione (<strong>${leader.name}</strong>, ${leader.poll.toFixed(1)}%) ha il rango e l'autorità politica per modificarne la denominazione ufficiale.</p>`);
+          return;
+        }
         game.coalitions[p.coalId].name = newName;
+        addFeed(`🤝 <strong>NUOVO NOME DEL POLO:</strong> ${game.leader.name} ribattezza ufficialmente la coalizione in <strong>"${newName}"</strong>!`, 'ok');
       }
-      addFeed(`🤝 <strong>NUOVO NOME DEL POLO:</strong> ${game.leader.name} ribattezza ufficialmente la coalizione in <strong>"${newName}"</strong>!`);
       updateAllUI();
     }
 

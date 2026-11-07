@@ -14,7 +14,8 @@ import {
   POLITICIANS,
   DOSSIERS,
   INITIAL_PARTIES,
-  BLOCS
+  BLOCS,
+  HOT_LAWS
 } from './data.js';
 
 import {
