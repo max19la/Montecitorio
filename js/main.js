@@ -26,7 +26,9 @@ import {
   getPlayerMinistry,
   computePartyDrift,
   getPartyIdeoScore,
-  ensurePlayerInPoliticians
+  ensurePlayerInPoliticians,
+  recordPoliticianHistory,
+  syncPartyNameWithLeader
 } from './state.js';
 
 import {
@@ -74,6 +76,9 @@ export function startGame() {
       game.lawCooldowns = {};
       game.referendumCooldowns = {};
       game.regCooldowns = {};
+      game.politicianHistoryMap = {};
+      game.politicianRoleMap = {};
+      game.politicianPartyMap = {};
       game.president.isPlayer = false;
       game.parties = JSON.parse(JSON.stringify(INITIAL_PARTIES));
       // Salva le posizioni storiche fondative (baseStances, baseIdeo, initialPoll) per ogni partito (Punto 1 v6.2)
@@ -88,7 +93,7 @@ export function startGame() {
 
       if (charMode === 'preset') {
         const pr = PRESET_POLITICIANS.find(x => x.id === document.getElementById('selRealPolitician').value) || PRESET_POLITICIANS[0];
-        game.leader = { name:pr.name, age:pr.age, gender:pr.gender, region:pr.region, personalIdeo:pr.ideo, prestige:85, internalSupport:pr.role==='secretary'?82:58 };
+        game.leader = { name:pr.name, age:pr.age, gender:pr.gender, region:pr.region, personalIdeo:pr.ideo, prestige:85, internalSupport:pr.role==='secretary'?82:58, history:[] };
         game.partyRole = pr.role;
         game.playerPartyId = pr.partyId;
         const pVal = Math.round(pr.ideo);
@@ -109,7 +114,7 @@ export function startGame() {
 
         if (role === 'independent') {
           const ideo = parseFloat(document.getElementById('inIndIdeo').value) || 2.0;
-          game.leader = { name, age, gender, region, personalIdeo:ideo, prestige:74, internalSupport:50 };
+          game.leader = { name, age, gender, region, personalIdeo:ideo, prestige:74, internalSupport:50, history:[] };
           game.partyRole = 'independent';
           game.playerPartyId = 'ind';
           DOSSIERS.forEach(d => game.personalStances[d.key] = Math.max(0, Math.min(4, Math.round(ideo))));
@@ -132,23 +137,24 @@ export function startGame() {
               { name:"Ala Riformatrice", leader:"Marco Cappato", share:22, desc:"Spinta tematica e referendaria." },
               { name:"Circoli Territoriali", leader:"Amministratori Locali", share:13, desc:"Rete civica regionale." }
             ],
-            splitName:"Movimento Riformatore", splitShort:"MR", bio:`Partito fondato da ${name}.`, vetoes:[], stances, baseStances:{...stances}, baseIdeo:defVal, lowPollWeeks:0, newlyFoundedGraceWeeks:52
+            splitName:"Cantiere Riformatore Italiano", splitShort:"CRI", bio:`Partito fondato da ${name}.`, vetoes:[], stances, baseStances:{...stances}, baseIdeo:defVal, lowPollWeeks:0, newlyFoundedGraceWeeks:52
           };
           game.parties.push(customP);
           game.playerPartyId = 'custom';
           game.partyRole = 'secretary';
           game.funds = 120;
-          game.leader = { name, age, gender, region, personalIdeo:defVal, prestige:65, internalSupport:85 };
+          game.leader = { name, age, gender, region, personalIdeo:defVal, prestige:65, internalSupport:85, history:[] };
           game.personalStances = { ...stances };
         } else {
           game.playerPartyId = selectedStartPartyId;
           const p = game.parties.find(x => x.id === selectedStartPartyId);
           game.partyRole = role;
           const ideo = getPartyIdeoScore(p);
-          game.leader = { name, age, gender, region, personalIdeo:ideo, prestige:role==='secretary'?82:70, internalSupport:role==='secretary'?80:52 };
+          game.leader = { name, age, gender, region, personalIdeo:ideo, prestige:role==='secretary'?82:70, internalSupport:role==='secretary'?80:52, history:[] };
           if (role === 'secretary') {
             p.wingLeader = p.leader; p.wingAge = p.leaderAge;
             p.leader = name; p.leaderAge = age;
+            syncPartyNameWithLeader(p, name);
             if (p.id === 'fdi') game.currentPM = name;
           } else {
             p.wingLeader = name; p.wingAge = age;
@@ -164,11 +170,18 @@ export function startGame() {
       initDemographicCalibrated();
       initAllPairRelationsAndCabinet();
 
+      const myMin = getPlayerMinistry();
+      const startRoleSummary = game.partyRole === 'independent'
+        ? 'Leader Indipendente nella XIX Legislatura'
+        : (game.partyRole === 'secretary'
+          ? `Segretario Nazionale di ${getP().name}${game.currentPM === game.leader.name ? ' e Presidente del Consiglio dei Ministri' : ''}`
+          : `Capocorrente in ${getP().name}${myMin ? ` e ${myMin.ministry.name}` : ''}`);
+      recordPoliticianHistory(game.leader.name, startRoleSummary, myMin ? myMin.ministry.name : undefined);
+
       document.getElementById('setupView').style.display = 'none';
       document.getElementById('appView').style.display = 'block';
       const ftd = document.getElementById('floatingTimeDock');
       if (ftd) ftd.style.display = 'flex';
-      const myMin = getPlayerMinistry();
       addFeed(`🏛️ Inizia la carriera politica di <strong>${game.leader.name} (${game.leader.age} anni)</strong> come <strong>${game.partyRole==='independent'?'Personalità Indipendente (Tema Bianco)':(game.partyRole==='secretary'?'Segretario Nazionale di '+getP().name:'Capocorrente interno in '+getP().name)}${myMin ? ` e 🏛️ ${myMin.ministry.name}` : ''}</strong>.`);
       updateAllUI();
     }

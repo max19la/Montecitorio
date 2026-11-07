@@ -31,7 +31,10 @@ export const game = {
       turnActionsUsed:[],
       regCooldowns:{},
       lastNoConfidenceTurn:-999,
-      leader:{ name:"Giorgia Meloni", age:49, gender:"F", region:"Lazio", personalIdeo:3.3, prestige:84, internalSupport:82, compass:{ economic:0.9, social:1.4, ideoScore:3.3 } },
+      leader:{ name:"Giorgia Meloni", age:49, gender:"F", region:"Lazio", personalIdeo:3.3, prestige:84, internalSupport:82, compass:{ economic:0.9, social:1.4, ideoScore:3.3 }, history:["Deputata dal 2006", "Ministro della Gioventù (2008-2011)", "Presidente del Consiglio dal 2022"] },
+      politicianHistoryMap:{},
+      politicianRoleMap:{},
+      politicianPartyMap:{},
       playerPartyId:'fdi',
       partyRole:'secretary', // 'secretary' | 'member' | 'independent'
       funds:450,
@@ -183,15 +186,52 @@ export function ensurePlayerInPoliticians() {
       return existing;
     }
 
-export function recordPoliticianHistory(polIdOrName, entry) {
+export function syncPartyNameWithLeader(party, newLeaderName) {
+  if (!party || !newLeaderName) return;
+  const cleanLeader = String(newLeaderName).replace(/\s*\(.*?\)/g, '').trim();
+  const parts = cleanLeader.split(/\s+/);
+  const lastName = parts.length > 1 ? parts.slice(1).join(' ') : parts[0];
+  if (party.id === 'lega' || /Lega.*Premier/i.test(party.name)) {
+    party.name = `Lega per ${lastName} Premier`;
+  } else if (party.personalParty && party.founderLeader && party.name.includes(party.founderLeader.split(' ').pop())) {
+    const oldLast = party.founderLeader.split(' ').pop();
+    party.name = party.name.replace(oldLast, lastName);
+  }
+}
+
+export function recordPoliticianHistory(polIdOrName, entry, newRole = null) {
   if (!polIdOrName || !entry) return;
-  const p = getPoliticianById(polIdOrName) || POLITICIANS.find(x => x.name === polIdOrName || x.id === polIdOrName);
+  const cleanTarget = String(polIdOrName).replace(/\s*\(Tecnico\)|\s*\(Indip\.\)|\s*\(Bis\)/gi, '').trim();
+  const p = getPoliticianById(polIdOrName)
+         || getPoliticianById(cleanTarget)
+         || POLITICIANS.find(x => x.name === cleanTarget || x.id === cleanTarget);
+  const dateStr = game?.date ? fmtDate(game.date) : '';
+  const fullEntry = dateStr ? `${entry} (${dateStr})` : entry;
+
+  if (!game.politicianHistoryMap) game.politicianHistoryMap = {};
+  if (!game.politicianRoleMap) game.politicianRoleMap = {};
+
   if (p) {
     if (!Array.isArray(p.history)) p.history = [];
-    const dateStr = game?.date ? fmtDate(game.date) : '';
-    const fullEntry = dateStr ? `${entry} (${dateStr})` : entry;
-    if (!p.history.includes(fullEntry) && !p.history.includes(entry)) {
+    // Evita duplicati identici consecutivi o nella stessa data
+    if (!p.history.includes(fullEntry) && p.history[0] !== fullEntry) {
       p.history.unshift(fullEntry);
+    }
+    game.politicianHistoryMap[p.id] = [...p.history];
+    if (newRole) {
+      p.role = newRole;
+      game.politicianRoleMap[p.id] = newRole;
+    }
+  }
+
+  // Se riguarda il giocatore, aggiorna anche game.leader.history
+  const leaderClean = String(game?.leader?.name || '').replace(/\s*\(Tecnico\)|\s*\(Indip\.\)|\s*\(Bis\)/gi, '').trim();
+  if (cleanTarget === leaderClean || polIdOrName === 'player_leader_pol' || (p && p.isPlayer)) {
+    if (!Array.isArray(game.leader.history)) {
+      game.leader.history = p && Array.isArray(p.history) ? [...p.history] : [];
+    }
+    if (!game.leader.history.includes(fullEntry)) {
+      game.leader.history.unshift(fullEntry);
     }
   }
 }
@@ -215,12 +255,40 @@ export function vacateOfficesForPresident(target) {
   const name = typeof target === 'object' ? target.name : target;
   const clean = String(name).replace(/\s*\(Tecnico\)|\s*\(Indip\.\)|\s*\(Bis\)/gi, '').trim();
 
-  // 1. Incompatibilità con la Presidenza del Consiglio: se il Premier eletto Capo dello Stato, nomina un successore autorevole di governo
-  if (game.currentPM && game.currentPM.replace(/\s*\(Tecnico\)|\s*\(Indip\.\)|\s*\(Bis\)/gi, '').trim() === clean) {
-    const successor = POLITICIANS.find(p => ['tajani_p', 'salvini_p', 'giorgetti_p', 'crosetto'].includes(p.id) && p.name !== clean)
-                   || POLITICIANS.find(p => (p.partyId === 'fdi' || p.partyId === 'fi' || p.partyId === 'lega') && p.name !== clean);
-    game.currentPM = successor ? successor.name : "Interim Istituzionale";
-    game.govStability = Math.max(35, game.govStability - 15);
+  // Aggiorna il ruolo e la storia del politico eletto al Quirinale (PUNTO 1 & PUNTO 6: rimuove vecchia carica come "Ministro della Difesa")
+  const electedPol = POLITICIANS.find(p => p.name === clean || p.id === target?.id);
+  let originLabel = "Garante della Costituzione";
+  if (electedPol) {
+    const oldParty = game.parties?.find(pt => pt.id === electedPol.partyId);
+    if (oldParty) originLabel = `Garante della Costituzione (Ex ${oldParty.short})`;
+    electedPol.role = (game.stateForm === 'presidenziale')
+      ? "Presidente della Repubblica e Capo dell'Esecutivo"
+      : "Presidente della Repubblica (Quirinale)";
+    if (!game.politicianRoleMap) game.politicianRoleMap = {};
+    game.politicianRoleMap[electedPol.id] = electedPol.role;
+  }
+  if (game.president && String(game.president.name).replace(/\s*\(Tecnico\)|\s*\(Indip\.\)|\s*\(Bis\)/gi, '').trim() === clean) {
+    game.president.area = (game.stateForm === 'presidenziale')
+      ? "Presidente della Repubblica e dell'Esecutivo (Presidenzialismo)"
+      : originLabel;
+  }
+  recordPoliticianHistory(clean, "Eletto Presidente della Repubblica al Quirinale", electedPol?.role || "Presidente della Repubblica");
+
+  // Nel Presidenzialismo il Presidente della Repubblica È anche Capo del Governo! (PUNTO 21)
+  if (game.stateForm === 'presidenziale') {
+    game.currentPM = clean;
+  } else {
+    // 1. Incompatibilità con la Presidenza del Consiglio: se il Premier è eletto Presidente della Repubblica, nomina un successore autorevole di governo
+    if (game.currentPM && game.currentPM.replace(/\s*\(Tecnico\)|\s*\(Indip\.\)|\s*\(Bis\)/gi, '').trim() === clean) {
+      const govPartyIds = (game.parties || []).filter(pt => pt.inGov).map(pt => pt.id);
+      const successor = POLITICIANS.find(p => govPartyIds.includes(p.partyId) && p.name !== clean && !getPersonCurrentOffice(p.name))
+                     || POLITICIANS.find(p => ['tajani_p', 'salvini_p', 'giorgetti_p', 'crosetto'].includes(p.id) && p.name !== clean);
+      game.currentPM = successor ? successor.name : "Interim Istituzionale";
+      if (successor) {
+        recordPoliticianHistory(successor.name, "Nominato Presidente del Consiglio dei Ministri", "Presidente del Consiglio");
+      }
+      game.govStability = Math.max(35, game.govStability - 15);
+    }
   }
 
   // 2. Incompatibilità Presidenza del Senato: scegli un senatore anziano che NON ricopra già un'altra carica di Stato!
@@ -228,6 +296,7 @@ export function vacateOfficesForPresident(target) {
     const alt = POLITICIANS.find(p => (p.partyId === 'fdi' || p.partyId === 'fi') && p.name !== clean && p.age >= 50 && !getPersonCurrentOffice(p.name))
              || POLITICIANS.find(p => p.partyId === 'tech' && p.name !== clean && p.age >= 50 && !getPersonCurrentOffice(p.name));
     game.senateSpeaker = alt ? { id: alt.id, name: alt.name, partyId: alt.partyId } : { id: 'vice_sen', name: 'Vicepresidente Vicario del Senato', partyId: 'ind' };
+    if (alt) recordPoliticianHistory(alt.name, "Eletto Presidente del Senato della Repubblica", "Presidente del Senato");
   }
 
   // 3. Incompatibilità Presidenza della Camera: scegli un deputato anziano che NON ricopra già un'altra carica di Stato!
@@ -235,6 +304,7 @@ export function vacateOfficesForPresident(target) {
     const alt = POLITICIANS.find(p => (p.partyId === 'lega' || p.partyId === 'fdi') && p.name !== clean && p.age >= 45 && !getPersonCurrentOffice(p.name))
              || POLITICIANS.find(p => p.partyId === 'tech' && p.name !== clean && p.age >= 45 && !getPersonCurrentOffice(p.name));
     game.chamberSpeaker = alt ? { id: alt.id, name: alt.name, partyId: alt.partyId } : { id: 'vice_cam', name: 'Vicepresidente Vicario della Camera', partyId: 'ind' };
+    if (alt) recordPoliticianHistory(alt.name, "Eletto Presidente della Camera dei Deputati", "Presidente della Camera");
   }
 
   // 4. Incompatibilità Ministeriale: se era ministro, riassegna il dicastero a un sostituto del partito o interim
@@ -242,11 +312,27 @@ export function vacateOfficesForPresident(target) {
     for (const mId of Object.keys(game.cabinet)) {
       const holder = game.cabinet[mId];
       if (holder && holder.name && holder.name.replace(/\s*\(Tecnico\)|\s*\(Indip\.\)|\s*\(Bis\)/gi, '').trim() === clean) {
+        const mObj = MINISTRIES.find(x => x.id === mId);
         const alt = POLITICIANS.find(p => p.partyId === holder.partyId && p.name !== clean && !getPersonCurrentOffice(p.name))
                  || POLITICIANS.find(p => p.partyId === 'tech' && p.name !== clean && !getPersonCurrentOffice(p.name));
         game.cabinet[mId] = alt || { id: `interim_${mId}`, name: 'Sottosegretario Vicario', partyId: holder.partyId || 'tech', competence: 75 };
+        if (alt && mObj) {
+          recordPoliticianHistory(alt.name, `Nominato Ministro: ${mObj.name.split(' (')[0]}`, `Ministro ${mObj.name.split(' (')[0]}`);
+        }
       }
     }
+  }
+
+  // 5. Se era segretario di un partito, il vicesegretario/capocorrente subentra (il Presidente della Repubblica è super partes, salvo presidenzialismo)
+  if (game.stateForm !== 'presidenziale' && Array.isArray(game.parties)) {
+    game.parties.forEach(pt => {
+      if (pt.leader && pt.leader.replace(/\s*\(Tecnico\)|\s*\(Indip\.\)|\s*\(Bis\)/gi, '').trim() === clean) {
+        const newSec = pt.wingLeader || POLITICIANS.find(x => x.partyId === pt.id && x.name !== clean)?.name || "Reggente Nazionale";
+        pt.leader = newSec;
+        syncPartyNameWithLeader(pt, newSec);
+        recordPoliticianHistory(newSec, `Eletto Segretario Nazionale di ${pt.short}`, `Segretario Nazionale ${pt.short}`);
+      }
+    });
   }
 }
 
@@ -287,13 +373,17 @@ export function getPersonCurrentOffice(polOrIdOrName, ignoreSlot = null, useDraf
       };
 
       // 1. Presidente della Repubblica
-      if (ignoreSlot !== 'president' && game.president && matchPerson(null, game.president.name)) {
-        return 'Presidente della Repubblica (Quirinale)';
+      if (ignoreSlot !== 'president' && !(game.stateForm === 'presidenziale' && ignoreSlot === 'pm') && game.president && matchPerson(null, game.president.name)) {
+        return game.stateForm === 'presidenziale'
+          ? "Presidente della Repubblica e Capo dell'Esecutivo"
+          : 'Presidente della Repubblica (Quirinale)';
       }
       // 2. Presidente del Consiglio (Premier)
       const pmName = useDraft ? (typeof draftPMName !== 'undefined' ? draftPMName : game.currentPM) : game.currentPM;
-      if (ignoreSlot !== 'pm' && pmName && matchPerson(null, pmName)) {
-        return 'Presidente del Consiglio (Palazzo Chigi)';
+      if (ignoreSlot !== 'pm' && !(game.stateForm === 'presidenziale' && ignoreSlot === 'president') && pmName && matchPerson(null, pmName)) {
+        return game.stateForm === 'presidenziale'
+          ? "Presidente della Repubblica e Capo dell'Esecutivo"
+          : 'Presidente del Consiglio (Palazzo Chigi)';
       }
       // 3. Presidente del Senato
       if (ignoreSlot !== 'senate') {
@@ -445,6 +535,26 @@ export function loadGame() {
     Object.assign(game, parsed.game);
     if (parsed.charMode) charMode = parsed.charMode;
     if (parsed.selectedStartPartyId) selectedStartPartyId = parsed.selectedStartPartyId;
+
+    // Ripristina la carriera dinamica, il ruolo e il partito dei politici salvati (PUNTI 1 & 16)
+    if (game.politicianHistoryMap) {
+      for (const [polId, hist] of Object.entries(game.politicianHistoryMap)) {
+        const pol = POLITICIANS.find(x => x.id === polId);
+        if (pol && Array.isArray(hist)) pol.history = [...hist];
+      }
+    }
+    if (game.politicianRoleMap) {
+      for (const [polId, role] of Object.entries(game.politicianRoleMap)) {
+        const pol = POLITICIANS.find(x => x.id === polId);
+        if (pol && role) pol.role = role;
+      }
+    }
+    if (game.politicianPartyMap) {
+      for (const [polId, partyId] of Object.entries(game.politicianPartyMap)) {
+        const pol = POLITICIANS.find(x => x.id === polId);
+        if (pol && partyId) pol.partyId = partyId;
+      }
+    }
 
     return true;
   } catch (err) {

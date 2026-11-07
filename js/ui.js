@@ -78,6 +78,18 @@ import {
 
 let activeSelectElement = null;
 
+// PUNTO 5 (1.7): Helper universale per rendere ogni nome di politico cliccabile in tutta l'interfaccia
+export function polLink(nameOrId, customLabel = null, extraStyle = '') {
+  if (!nameOrId) return customLabel || 'N/D';
+  const raw = String(nameOrId).replace(/\s*\(Tecnico\)/i, '').replace(/\s*\(Governo Tecnico\)/i, '').trim();
+  if (raw === 'Amministratori Locali' || raw === 'Base Militante' || raw === 'Assemblea Regionale' || raw === 'Coordinamento Civico' || raw === 'Consiglio Direttivo' || raw === 'Militanti di Base' || raw === 'Rete Territoriale') {
+    return customLabel || String(nameOrId);
+  }
+  const safeArg = raw.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  const lbl = customLabel !== null ? customLabel : String(nameOrId);
+  return `<span class="pol-click-link" style="cursor:pointer; text-decoration:underline; text-decoration-color:rgba(253,224,71,0.45); text-underline-offset:2px; ${extraStyle}" onclick="event.stopPropagation();openPoliticianCardModal('${safeArg}')" title="Clicca per aprire la Scheda Biografica e la Bussola 2D di ${raw.replace(/"/g, '&quot;')}">${lbl}</span>`;
+}
+
 export function setCharMode(m) {
       setCharModeState(m);
       document.getElementById('charPresetBox').style.display = m==='preset'?'block':'none';
@@ -147,7 +159,7 @@ export function renderSetupParties() {
           <div style="width:36px; height:36px; flex-shrink:0;">${getPartySVG(p.id,p.short,p.color)}</div>
           <div>
             <div style="font-weight:800; font-size:12px;">${p.name}</div>
-            <div style="font-size:10px; color:var(--muted);">${p.leader} (${p.leaderAge}a) • ${p.area}</div>
+            <div style="font-size:10px; color:var(--muted);">${polLink(p.leader)} (${p.leaderAge}a) • ${p.area}</div>
             <div style="font-size:10.5px; font-weight:800; color:${p.color};">${p.poll}% (${p.seats} seggi) ${p.inGov?'🟢':'🔴'}</div>
           </div>
         </div>
@@ -158,7 +170,7 @@ export function renderSetupParties() {
 
 
 export function openTutorialModal() {
-      document.getElementById('mTag').textContent = "GUIDA UFFICIALE A MONTECITORIO v5.2";
+      document.getElementById('mTag').textContent = "GUIDA UFFICIALE A MONTECITORIO 1.7";
       document.getElementById('mTitle').textContent = "📖 Come Funziona la Simulazione Politica";
       document.getElementById('mBody').innerHTML = `
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:6px;">
@@ -241,7 +253,7 @@ export function explainKPI(key) {
             : "Misura la solidità della maggioranza parlamentare che sostiene il Governo a Palazzo Chigi.",
           how: game.isDictatorship
             ? "• Se il consenso popolare del regime è basso e il <strong>Rischio Rivolta raggiunge il 100%</strong>, scoppia l'insurrezione nazionale e il dittatore viene rovesciato e arrestato!"
-            : "• Se scende a <strong>0%</strong> (per crisi di coalizione, spread oltre 250 pt o bocciature in Aula), il Governo cade e il Quirinale scioglie le Camere!"
+            : "• Se scende a <strong>0%</strong> (per crisi di coalizione, spread oltre 250 pt o bocciature in Aula), il Governo cade e il Presidente della Repubblica avvia le consultazioni al Quirinale!"
         },
         macro: {
           title: "📈 Spread BTP-Bund & Crescita del PIL",
@@ -253,7 +265,7 @@ export function explainKPI(key) {
           title: "🗳️ Calendario Elettorale & Ordinamento dello Stato",
           val: `Ordinamento: ${STATE_FORMS.find(s=>s.id===game.stateForm)?.name || game.stateForm}`,
           desc: "Indica la forma di governo vigente nella Repubblica e i giorni mancanti alle prossime Elezioni Politiche.",
-          how: "• Puoi cambiare la forma di Stato (es. passare alla <strong>Repubblica Presidenziale con elezione diretta del Capo dello Stato</strong> o al <strong>Premierato</strong>) nella scheda <em>Governo, Stato & Golpe</em>!"
+          how: "• Puoi cambiare la forma di Stato (es. passare alla <strong>Repubblica Presidenziale con elezione diretta del Presidente della Repubblica</strong> o al <strong>Premierato</strong>) nella scheda <em>Governo, Stato & Golpe</em>!"
         }
       }[key];
       if (!info) return;
@@ -342,12 +354,12 @@ export function renderCareerTab() {
         <div class="grid2" style="margin-bottom:10px;">
           <div class="box" style="border-color:var(--gold-bd);">
             <div style="display:flex; justify-content:space-between; align-items:start;">
-              <h4>👤 ${game.leader.name} (${game.leader.age} anni • ${game.leader.region}) ${game.isImprisoned ? '<span style="color:#ef4444;">[⛓️ DETENUTO A REBIBBIA]</span>' : (game.inExile ? `<span style="color:#f87171;">[✈️ IN ESILIO A ${game.exileHost.toUpperCase()}]</span>` : '')}</h4>
-              <button class="btn btn-w" style="font-size:10px; padding:3px 7px;" onclick="openPoliticianCardModal('player_leader_pol')">🧭 Bussola 2D</button>
+              <h4>👤 ${polLink('player_leader_pol', game.leader.name)} (${game.leader.age} anni • ${game.leader.region}) ${game.isImprisoned ? '<span style="color:#ef4444;">[⛓️ DETENUTO A REBIBBIA]</span>' : (game.inExile ? `<span style="color:#f87171;">[✈️ IN ESILIO A ${game.exileHost.toUpperCase()}]</span>` : '')}</h4>
+              <button class="btn btn-w" style="font-size:10px; padding:3px 7px;" onclick="openPoliticianCardModal('player_leader_pol')">🧭 Scheda & Bussola 2D</button>
             </div>
             <p style="margin-bottom:6px;">
               Orientamento Ideologico: <strong style="color:var(--gold-lt);">${ideoLabel} (${myIdeo}/4.0)</strong><br>
-              Status Attuale: <strong style="color:#38bdf8;">${game.isImprisoned ? `⛓️ Ex-Leader Detenuto a Rebibbia (${game.prisonDaysLeft} giorni alla libertà)` : (game.inExile ? `✈️ Esule politico a ${game.exileHost}` : (isInd ? '📄 Personalità Indipendente (Tema Bianco Istituzionale)' : (isSec ? `👑 Segretario Nazionale di ${p.name} (Congresso nel ${p.nextCongYear||2028})` : `⚔️ Capocorrente interno in ${p.name} (Segretario: ${p.leader}, Congresso nel ${p.nextCongYear||2028})`)))}</strong>
+              Status Attuale: <strong style="color:#38bdf8;">${game.isImprisoned ? `⛓️ Ex-Leader Detenuto a Rebibbia (${game.prisonDaysLeft} giorni alla libertà)` : (game.inExile ? `✈️ Esule politico a ${game.exileHost}` : (isInd ? '📄 Personalità Indipendente (Tema Bianco Istituzionale)' : (isSec ? `👑 Segretario Nazionale di ${p.name} (Congresso nel ${p.nextCongYear||2028})` : `⚔️ Capocorrente interno in ${p.name} (Segretario: ${polLink(p.leader)}, Congresso nel ${p.nextCongYear||2028})`)))}</strong>
             </p>
             <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:6px; background:var(--bg-1); padding:7px; border-radius:6px; font-size:11px; text-align:center; margin-bottom:8px;">
               <div>Prestigio Personale<br><strong style="color:#d8b4fe; font-size:13px;">${game.leader.prestige}%</strong></div>
@@ -390,7 +402,7 @@ export function renderCareerTab() {
                 ${factions.map((f, idx) => `
                   <div style="background:var(--bg-1); padding:6px 9px; border-radius:7px; border-left:3px solid ${idx===0?p.color:(idx===1?'#fde047':'#38bdf8')}; font-size:11.5px;">
                     <div style="display:flex; justify-content:space-between;">
-                      <strong>${idx===0?'👑':'⚔️'} ${f.name} — Leader: <em>${f.leader}</em></strong>
+                      <strong>${idx===0?'👑':'⚔️'} ${f.name} — Leader: <em>${polLink(f.leader)}</em></strong>
                       <strong style="color:var(--gold-lt);">${f.share}%</strong>
                     </div>
                     <div style="font-size:10.5px; color:var(--muted);">${f.desc}</div>
@@ -402,8 +414,8 @@ export function renderCareerTab() {
         </div>
 
         <div class="box" style="margin-bottom:10px;">
-          <h4>🔄 Passaggio a un Altro Partito & Effetto sui Partiti Personali (Punti 2, 5, Bug Fix 2)</h4>
-          <p>Quando entri in un altro partito, entri come <strong>Capocorrente interno</strong> e devi vincere il Congresso per diventarne Segretario. <strong>Novità v5.2:</strong> se lasci un partito che dipendeva dalla tua leadership (es. <em>Renzi lascia Italia Viva per il PD</em>), potrai scegliere se <strong>sciogliere il tuo vecchio partito facendolo confluire</strong> nel nuovo (+seggi e +forza corrente) o lasciarlo trasformare/crollare! E se sei Presidente del Consiglio e cambi casacca, si aprirà immediatamente la <strong>Crisi di Governo al Quirinale</strong>!</p>
+          <h4>🔄 Passaggio a un Altro Partito & Effetto sui Partiti Personali</h4>
+          <p>Quando entri in un altro partito, entri come <strong>Capocorrente interno</strong> e devi vincere il Congresso per diventarne Segretario. Se lasci un partito che dipendeva dalla tua leadership (es. <em>Renzi lascia Italia Viva per il PD</em>), potrai scegliere se <strong>sciogliere il tuo vecchio partito facendolo confluire</strong> nel nuovo (+seggi e +forza corrente) o lasciarlo trasformare/crollare! E se sei Presidente del Consiglio e cambi casacca, si aprirà immediatamente la <strong>Crisi di Governo al Quirinale</strong>!</p>
         </div>
 
         <div class="grid3">
@@ -419,7 +431,7 @@ export function renderCareerTab() {
                     <div style="width:28px; height:28px; flex-shrink:0;">${getPartySVG(target.id,target.short,target.color)}</div>
                     <div>
                       <h4 style="text-decoration:underline; text-decoration-color:rgba(255,255,255,0.25);">${target.name} (${target.poll}%) 🔍</h4>
-                      <div style="font-size:10px; color:var(--muted);">Segretario: <strong>${target.leader}</strong> • ${target.area}</div>
+                      <div style="font-size:10px; color:var(--muted);">Segretario: <strong>${polLink(target.leader)}</strong> • ${target.area}</div>
                     </div>
                   </div>
                 </div>
@@ -494,7 +506,7 @@ export function renderProgTab() {
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
               <div>
                 <strong style="color:#fde047; font-size:12.5px;">🔒 Programma Ufficiale di ${p.short} Riservato al Segretario</strong>
-                <p style="font-size:11.5px; margin:2px 0 0 0;">Come membro/capocorrente non puoi modificare arbitrariamente i dossier. Il Programma Ufficiale appartiene al Segretario Nazionale (<strong>${p.leader}</strong>). Per imporre la tua linea, sfidalo al prossimo Congresso o guida una scissione.</p>
+                <p style="font-size:11.5px; margin:2px 0 0 0;">Come membro/capocorrente non puoi modificare arbitrariamente i dossier. Il Programma Ufficiale appartiene al Segretario Nazionale (<strong>${polLink(p.leader)}</strong>). Per imporre la tua linea, sfidalo al prossimo Congresso o guida una scissione.</p>
               </div>
               <button class="btn btn-w" style="font-size:11px;" onclick="showTab('tCareer', document.querySelectorAll('.nav-item')[0])">🗳️ Scheda Congresso →</button>
             </div>
@@ -780,8 +792,8 @@ export function renderCoalTab() {
               </h4>
               <p>
                 ${isInd
-                  ? 'Come personalità Indipendente puoi dialogare con tutti i partiti, mediare tra i poli o iscriverti a una forza politica. <strong>Tocca qualsiasi icona di partito in ogni menu per aprirne la Scheda Completa!</strong>'
-                  : `Membri del tuo Polo: <strong>${coalMembers.map(m=>m.short).join(' • ')}</strong> — Consenso Totale: <strong style="color:#34d399;">${coalPollSum.toFixed(1)}%</strong> (<strong>${coalSeatsSum} seggi</strong> su 400) • Leader Coalizione: <strong>${coalLead ? coalLead.leader + ' (' + coalLead.short + ')' : p.leader}</strong>.`}
+                  ? 'Come personalità Indipendente puoi dialogare con tutti i partiti, mediare tra i poli o iscriverti a una forza politica. <strong>Tocca qualsiasi icona di partito o nome di politico per aprirne la Scheda Completa!</strong>'
+                  : `Membri del tuo Polo: <strong>${coalMembers.map(m=>m.short).join(' • ')}</strong> — Consenso Totale: <strong style="color:#34d399;">${coalPollSum.toFixed(1)}%</strong> (<strong>${coalSeatsSum} seggi</strong> su 400) • Leader Coalizione: <strong>${coalLead ? polLink(coalLead.leader) + ' (' + coalLead.short + ')' : polLink(p.leader)}</strong>.`}
               </p>
             </div>
             ${!isInd && !game.isImprisoned ? (() => {
@@ -831,7 +843,7 @@ export function renderCoalTab() {
                 <div style="width:36px; height:36px;">${getPartySVG(inspTarget.id, inspTarget.short, inspTarget.color)}</div>
                 <div>
                   <h4 style="color:${inspTarget.color}; margin:0;">🔍 Confronto Programmatico & Struttura: ${inspTarget.name} (${inspTarget.short})</h4>
-                  <div style="font-size:11px; color:var(--muted);">Segretario: <strong>${inspTarget.leader} (${inspTarget.leaderAge}a)</strong> • Capocorrente: <strong>${inspTarget.wingLeader || 'N/D'}</strong> • Compatibilità Globale: <strong style="color:${inspCmp.total>=60?'#34d399':'#fde047'};">${inspCmp.total}%</strong></div>
+                  <div style="font-size:11px; color:var(--muted);">Segretario: <strong>${polLink(inspTarget.leader)} (${inspTarget.leaderAge}a)</strong> • Capocorrente: <strong>${polLink(inspTarget.wingLeader || 'N/D')}</strong> • Compatibilità Globale: <strong style="color:${inspCmp.total>=60?'#34d399':'#fde047'};">${inspCmp.total}%</strong></div>
                 </div>
               </div>
               <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
@@ -872,7 +884,7 @@ export function renderCoalTab() {
                     <div style="width:30px; height:30px;">${getPartySVG(o.id, o.short, o.color)}</div>
                     <div>
                       <strong style="color:${o.color}; font-size:13.5px; text-decoration:underline; text-decoration-color:rgba(255,255,255,0.25);">${o.name} (${o.short}) 🔍</strong>
-                      <div style="font-size:10.5px; color:var(--muted);">Leader: <strong>${o.leader}</strong> • ${getIdeoLabel(getPartyIdeoScore(o))}</div>
+                      <div style="font-size:10.5px; color:var(--muted);">Leader: <strong>${polLink(o.leader)}</strong> • ${getIdeoLabel(getPartyIdeoScore(o))}</div>
                     </div>
                   </div>
                   <span style="font-size:11px; padding:2px 8px; border-radius:99px; background:var(--bg-1); font-weight:800;">${o.poll.toFixed(1)}% (${o.seats} seggi)</span>
@@ -912,10 +924,12 @@ export function renderMinTab() {
       ensurePlayerInPoliticians();
       const p = getP();
       const govParties = game.parties.filter(pt => pt.inGov && pt.seats > 0);
+      const oppParties = game.parties.filter(pt => !pt.inGov && pt.seats > 0);
       const govPartyIds = new Set(govParties.map(pt => pt.id));
       const totalGovSeats = Math.max(1, govParties.reduce((a,b) => a + b.seats, 0));
-      const isPlayerPM = (game.currentPM === game.leader.name && p.inGov) || game.isDictatorship;
+      const isPlayerPM = (game.currentPM === game.leader.name && p.inGov) || (game.stateForm === 'presidenziale' && game.president.isPlayer) || game.isDictatorship;
       const myMin = getPlayerMinistry();
+      const isPresidential = (game.stateForm === 'presidenziale');
 
       // SOLO politici appartenenti ai partiti della Maggioranza di Governo!
       const majorityPols = POLITICIANS.filter(x => govPartyIds.has(x.partyId));
@@ -923,6 +937,40 @@ export function renderMinTab() {
       const ministerPool = POLITICIANS.filter(x => govPartyIds.has(x.partyId) || x.partyId === 'tech');
 
       box.innerHTML = `
+        <!-- PUNTO 3 (1.7): QUADRO ESPLICITO DEI PARTITI AL GOVERNO (MAGGIORANZA) E ALL'OPPOSIZIONE -->
+        <div class="box" style="border-color:#10b981; background:linear-gradient(135deg, rgba(16,185,129,0.12), rgba(11,18,32,0.95)); margin-bottom:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+            <div>
+              <h4 style="color:#34d399; margin:0;">
+                🟢 PARTITI ATTUALMENTE AL GOVERNO (${game.isTechnicalGov ? 'Governo Tecnico di Garanzia' : (isPresidential ? `Esecutivo Presidenziale ${game.president.name}` : `Coalizione ${getCoalName(game.currentGovCoalId)} — Governo ${game.currentPM}`)})
+              </h4>
+              <div style="font-size:11.5px; color:var(--muted); margin-top:2px;">
+                ${isPresidential ? `Presidente della Repubblica e Capo dell'Esecutivo: <strong style="color:var(--gold-lt);">${polLink(game.president.name)}</strong>` : `Presidente del Consiglio in carica: <strong style="color:var(--gold-lt);">${polLink(game.currentPM)}</strong>`} •
+                Forza parlamentare della Maggioranza: <strong style="color:#34d399;">${govParties.reduce((s,x)=>s+x.seats,0)} / 400 Deputati</strong>
+              </div>
+            </div>
+            <span style="background:rgba(16,185,129,0.2); color:#34d399; border:1px solid #10b981; padding:4px 10px; border-radius:99px; font-size:11px; font-weight:800;">
+              ${p.inGov ? '✅ Il Tuo Partito è AL GOVERNO' : '⚔️ Il Tuo Partito è ALL\'OPPOSIZIONE'}
+            </span>
+          </div>
+          <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px;">
+            ${govParties.map(pt => `
+              <div style="display:inline-flex; align-items:center; gap:6px; background:var(--bg-0); border:1.5px solid ${pt.color}; padding:4px 9px; border-radius:8px; cursor:pointer; font-size:11.5px;" onclick="openPartyInspectorModal('${pt.id}')" title="Ispeziona ${pt.name}">
+                <span style="width:18px; height:18px; display:inline-flex;">${getPartySVG(pt.id, pt.short, pt.color)}</span>
+                <strong style="color:${pt.color};">${pt.name} (${pt.short})</strong>
+                <span style="color:#fff; font-weight:800;">${pt.seats} seggi</span>
+                <span style="color:var(--muted); font-size:10.5px;">• ${polLink(pt.leader)}</span>
+              </div>
+            `).join('')}
+          </div>
+          ${oppParties.length > 0 ? `
+            <div style="font-size:11px; color:var(--muted); border-top:1px solid var(--bd); padding-top:6px;">
+              🔴 <strong>Partiti all'Opposizione (${oppParties.reduce((s,x)=>s+x.seats,0)} seggi):</strong>
+              ${oppParties.map(pt => `<span style="cursor:pointer; color:${pt.color}; font-weight:700; margin-left:6px;" onclick="openPartyInspectorModal('${pt.id}')">${pt.short} (${pt.seats}s)</span>`).join(' • ')}
+            </div>
+          ` : ''}
+        </div>
+
         <!-- PUNTO 17 (v6.2): PANNELLO OPERATIVO DEL GIOCATORE NOMINATO MINISTRO -->
         ${myMin ? `
           <div class="box" style="border:2px solid var(--gold); background:linear-gradient(135deg, rgba(212,175,55,0.16), rgba(15,23,42,0.96)); margin-bottom:12px;">
@@ -930,11 +978,11 @@ export function renderMinTab() {
               <div>
                 <h4 style="color:var(--gold-lt); margin:0;">💼 IL TUO DICASTERO MINISTERIALE: ${myMin.ministry.name.toUpperCase()}</h4>
                 <p style="margin-top:2px;">
-                  Sei titolare di questo Ministero nel <strong>Governo ${game.currentPM}</strong> (una sola carica istituzionale consentita). Esercita i poteri del tuo portafoglio ministeriale per incidere sull'azione di governo e far crescere il tuo prestigio e il consenso del tuo partito:
+                  Sei titolare di questo Ministero nel <strong>Governo ${polLink(game.currentPM)}</strong> (una sola carica istituzionale consentita). Esercita i poteri del tuo portafoglio ministeriale per incidere sull'azione di governo e far crescere il tuo prestigio e il consenso del tuo partito:
                 </p>
               </div>
               <span style="background:rgba(212,175,55,0.22); color:var(--gold-lt); border:1px solid var(--gold); padding:4px 10px; border-radius:99px; font-size:11px; font-weight:800;">
-                🏛️ Ministro in Carica (${game.leader.name})
+                🏛️ Ministro in Carica (${polLink('player_leader_pol', game.leader.name)})
               </span>
             </div>
             <div class="grid3" style="margin-top:6px;">
@@ -953,7 +1001,7 @@ export function renderMinTab() {
           <p style="margin-bottom:10px;">
             ${game.isDictatorship
               ? 'In regime dittatoriale puoi nominare per decreto i Presidenti delle due Assemblee scegliendoli tra i fedelissimi del tuo partito.'
-              : 'Nella Repubblica Parlamentare i Presidenti di Senato e Camera vengono eletti con <strong>votazione a scrutinio segreto dell\'Aula</strong>. <strong>Divieto assoluto di cumulo delle cariche (Punto 2 v6.2):</strong> chi è già Presidente della Repubblica, Premier, Presidente d\'Assemblea o Ministro non può assumere una seconda carica!'}
+              : 'Nella Repubblica i Presidenti di Senato e Camera vengono eletti con <strong>votazione a scrutinio segreto dell\'Aula</strong>. <strong>Divieto assoluto di cumulo delle cariche:</strong> chi è già Presidente della Repubblica, Premier, Presidente d\'Assemblea o Ministro non può assumere una seconda carica!'}
           </p>
           <div class="grid2">
             <div class="box" style="margin-bottom:0;">
@@ -1009,15 +1057,17 @@ export function renderMinTab() {
           <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
             <div>
               <h4 style="color:var(--gold-lt);">
-                ${game.isDictatorship ? `🦅 Giunta Esecutiva del Regime (${game.currentPM})` : `⚖️ Equilibrio di Coalizione (Manuale Cencelli su ${MINISTRIES.length} Dicasteri) — Governo ${game.currentPM}`}
+                ${game.isDictatorship ? `🦅 Giunta Esecutiva del Regime (${polLink(game.currentPM)})` : (isPresidential ? `🦅 Gabinetto Esecutivo Presidenziale (${MINISTRIES.length} Dicasteri) — Presiede ${polLink(game.president.name)}` : `⚖️ Equilibrio di Coalizione (Manuale Cencelli su ${MINISTRIES.length} Dicasteri) — Governo ${polLink(game.currentPM)}`)}
               </h4>
               <p>
                 ${game.isDictatorship
                   ? 'I Ministri rispondono esclusivamente a te come Capo del Regime.'
-                  : 'Ogni Ministro può dirigere <strong>un solo dicastero</strong> e non può cumulare la carica con la Presidenza della Repubblica, di Palazzo Chigi o di Camera e Senato.'}
+                  : (isPresidential
+                    ? 'Nella Repubblica Presidenziale i Ministri/Segretari di Stato rispondono direttamente al Presidente della Repubblica eletto dal popolo (senza vincolo di fiducia parlamentare).'
+                    : 'Ogni Ministro può dirigere <strong>un solo dicastero</strong> e non può cumulare la carica con la Presidenza della Repubblica, di Palazzo Chigi o di Camera e Senato.')}
               </p>
             </div>
-            ${isPlayerPM && !game.isImprisoned ? `<button class="btn btn-w" onclick="openManualGovernmentFormationModal(game.parties.filter(x=>x.inGov), game.currentPM, game.currentGovCoalId)">🏛️ Rimpasto Generale al Quirinale</button>` : ''}
+            ${isPlayerPM && !game.isImprisoned ? `<button class="btn btn-w" onclick="openManualGovernmentFormationModal(game.parties.filter(x=>x.inGov), game.currentPM, game.currentGovCoalId)">🏛️ ${isPresidential ? 'Rimpasto Diretto del Gabinetto Presidenziale' : 'Rimpasto Generale al Quirinale'}</button>` : ''}
           </div>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
             ${govParties.map(pt => {
@@ -1189,17 +1239,20 @@ export function renderGovTab() {
               <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">
                 <button class="btn btn-m" onclick="passBudget()">📜 Approva Legge di Bilancio (30 ⚡)</button>
                 ${!game.isDictatorship ? `
-                  <button class="btn" onclick="govVerifica()">🤝 Verifica di Maggioranza (20 ⚡)</button>
-                  <button class="btn btn-r" onclick="openCrisis()">💣 Apri Crisi di Governo</button>
+                  <button class="btn" onclick="govVerifica()">🤝 ${game.stateForm === 'presidenziale' ? 'Vertice del Gabinetto Presidenziale (20 ⚡)' : 'Verifica di Maggioranza (20 ⚡)'}</button>
+                  <button class="btn btn-r" onclick="openCrisis()">${game.stateForm === 'presidenziale' ? '🦅 Rimpasto Esecutivo Presidenziale' : '💣 Apri Crisi di Governo'}</button>
                 ` : ''}
               </div>
             ` : `
-              <p style="margin-bottom:10px;">${game.isImprisoned ? '🔒 Sei detenuto a Rebibbia: non puoi partecipare alle sessioni di bilancio.' : `Sei all'Opposizione rispetto al Governo <strong>${game.currentPM}</strong>. Usa gli strumenti parlamentari per incalzare l'Esecutivo:`}</p>
+              <p style="margin-bottom:10px;">${game.isImprisoned ? '🔒 Sei detenuto a Rebibbia: non puoi partecipare alle sessioni di bilancio.' : `Sei all'Opposizione rispetto al Governo <strong>${polLink(game.currentPM)}</strong>. Usa gli strumenti parlamentari per incalzare l'Esecutivo:`}</p>
               ${!game.isImprisoned ? `
                 <div style="display:flex; flex-direction:column; gap:7px;">
                   <button class="btn" onclick="oppHearing()">🔍 Question Time & Interrogazione a Montecitorio (15 ⚡)</button>
                   <button class="btn" onclick="oppFilibuster()">🧱 Ostruzionismo in Commissione Bilancio (20 ⚡)</button>
-                  <button class="btn btn-r" onclick="tableSfiducia()">⚖️ Deposita Mozione di Sfiducia al Governo (30 ⚡)</button>
+                  ${game.stateForm === 'presidenziale'
+                    ? `<button class="btn" style="opacity:0.65;" onclick="tableSfiducia()">🦅 Separazione dei Poteri: Nessuna Fiducia Parlamentare nel Presidenzialismo</button>`
+                    : `<button class="btn btn-r" onclick="tableSfiducia()">⚖️ ${game.stateForm === 'cancellierato' ? 'Deposita Mozione di Sfiducia Costruttiva al Cancelliere (30 ⚡)' : 'Deposita Mozione di Sfiducia al Governo (30 ⚡)'}</button>`
+                  }
                 </div>
               ` : ''}
             `}
@@ -1243,12 +1296,12 @@ export function renderGovTab() {
         <div class="box" style="border-color:var(--gold-bd); margin-bottom:14px; background:linear-gradient(135deg, rgba(212,175,55,0.06), rgba(15,23,42,0.95));">
           <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
             <div>
-              <div style="font-size:10.5px; font-weight:800; color:var(--gold-lt); letter-spacing:0.8px;">PALAZZO CHIGI • TAVOLO STRATEGICO DELL'ESECUTIVO</div>
+              <div style="font-size:10.5px; font-weight:800; color:var(--gold-lt); letter-spacing:0.8px;">${game.stateForm === 'presidenziale' ? 'QUIRINALE & PALAZZO CHIGI • PRESIDENZA ESECUTIVA DELLA REPUBBLICA' : 'PALAZZO CHIGI • TAVOLO STRATEGICO DELL\'ESECUTIVO'}</div>
               <h4 style="margin:2px 0; color:#fff; font-size:16px;">
-                ${game.isTechnicalGov ? '🏛️ Governo Tecnico di Garanzia del Presidente' : `🏛️ Governo ${game.currentPM}`}
+                ${game.isTechnicalGov ? '🏛️ Governo Tecnico di Garanzia del Presidente della Repubblica' : (game.stateForm === 'presidenziale' ? `🦅 Amministrazione Presidenziale ${polLink(game.president.name)}` : `🏛️ Governo ${polLink(game.currentPM)}`)}
               </h4>
               <div style="font-size:11.5px; color:var(--muted);">
-                Presidente del Consiglio: <strong style="color:var(--gold-lt);">${game.currentPM}</strong> •
+                ${game.stateForm === 'presidenziale' ? `Presidente della Repubblica e Capo dell'Esecutivo: <strong style="color:var(--gold-lt);">${polLink(game.president.name)}</strong>` : `Presidente del Consiglio: <strong style="color:var(--gold-lt);">${polLink(game.currentPM)}</strong>`} •
                 Formula: <strong>${game.isTechnicalGov ? 'Salvezza Nazionale Istituzionale' : `Coalizione ${getCoalName(game.currentGovCoalId)}`}</strong>
               </div>
             </div>
@@ -1534,17 +1587,46 @@ export function renderParlTab() {
       }).join('');
 
       const govS = game.parties.filter(pt => pt.inGov).reduce((s, pt) => s + pt.seats, 0);
+      const govParties = game.parties.filter(pt => pt.inGov && pt.seats > 0);
+      const oppParties = game.parties.filter(pt => !pt.inGov && pt.seats > 0);
       const curStateForm = STATE_FORMS.find(s => s.id === game.stateForm) || STATE_FORMS[0];
+      const isPresidential = (game.stateForm === 'presidenziale');
 
       box.innerHTML = `
+        <!-- PUNTO 3 (1.7): BANNER ESPLICITO DEI PARTITI AL GOVERNO ANCHE NELLA SCHEDA EMICICLO -->
+        <div class="box" style="border-color:#10b981; background:linear-gradient(135deg, rgba(16,185,129,0.10), rgba(11,18,32,0.95)); margin-bottom:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:6px;">
+            <div>
+              <strong style="color:#34d399; font-size:13px;">🟢 Partiti di Maggioranza al Governo (${govS}/400 seggi — ${game.isTechnicalGov ? 'Governo Tecnico' : `Coalizione ${getCoalName(game.currentGovCoalId)}`}):</strong>
+            </div>
+            <span style="font-size:11px; color:var(--gold-lt); font-weight:800;">
+              ${isPresidential ? `Presidente Esecutivo: ${polLink(game.president.name)}` : `Premier: ${polLink(game.currentPM)}`}
+            </span>
+          </div>
+          <div style="display:flex; flex-wrap:wrap; gap:6px;">
+            ${govParties.map(pt => `
+              <span style="display:inline-flex; align-items:center; gap:5px; background:var(--bg-0); border:1px solid ${pt.color}; padding:3px 8px; border-radius:6px; font-size:11px; cursor:pointer;" onclick="openPartyInspectorModal('${pt.id}')">
+                <span style="color:${pt.color}; font-weight:800;">${pt.name} (${pt.short})</span>
+                <strong style="color:#fff;">${pt.seats} seggi</strong>
+                <span style="color:var(--muted);">• ${polLink(pt.leader)}</span>
+              </span>
+            `).join('')}
+          </div>
+          ${oppParties.length > 0 ? `
+            <div style="font-size:10.5px; color:var(--muted); margin-top:6px;">
+              🔴 <strong>Opposizione (${400 - govS} seggi):</strong> ${oppParties.map(pt => `<span style="cursor:pointer; color:${pt.color}; font-weight:700;" onclick="openPartyInspectorModal('${pt.id}')">${pt.short} (${pt.seats})</span>`).join(' • ')}
+            </div>
+          ` : ''}
+        </div>
+
         <div class="grid2">
           <div class="box" style="text-align:center; margin-bottom:0;">
             <h4 style="color:${game.isDictatorship?'#fca5a5':'var(--gold-lt)'}; margin-bottom:4px;">
               ${game.isDictatorship ? `🦅 Assemblea Nazionale del Regime (${govS}/400 Seggi al Regime)` : '🏛️ Emiciclo Camera dei Deputati (Sinistra ⬅️ Centro ➡️ Destra)'}
             </h4>
             <div style="font-size:11px; color:var(--muted); margin-bottom:4px;">
-              🔔 Pres. Camera: <strong style="color:#fff;">${game.chamberSpeaker?.name || 'Lorenzo Fontana'}</strong> (${(game.parties.find(x=>x.id===game.chamberSpeaker?.partyId)?.short)||'Lega'}) •
-              🏛️ Pres. Senato: <strong style="color:#fff;">${game.senateSpeaker?.name || 'Ignazio La Russa'}</strong> (${(game.parties.find(x=>x.id===game.senateSpeaker?.partyId)?.short)||'FdI'})
+              🔔 Pres. Camera: <strong style="color:#fff;">${polLink(game.chamberSpeaker?.id || 'fontana_l', game.chamberSpeaker?.name || 'Lorenzo Fontana')}</strong> (${(game.parties.find(x=>x.id===game.chamberSpeaker?.partyId)?.short)||'Lega'}) •
+              🏛️ Pres. Senato: <strong style="color:#fff;">${polLink(game.senateSpeaker?.id || 'larussa', game.senateSpeaker?.name || 'Ignazio La Russa')}</strong> (${(game.parties.find(x=>x.id===game.senateSpeaker?.partyId)?.short)||'FdI'})
             </div>
             <svg viewBox="0 0 520 260" style="width:100%; max-width:520px; height:auto;">
               <text x="45" y="252" fill="#fca5a5" font-size="9" font-weight="800">⬅️ SINISTRA</text>
@@ -1562,10 +1644,10 @@ export function renderParlTab() {
           <div class="box" style="margin-bottom:0;">
             ${game.isDictatorship ? `
               <h4 style="color:#fca5a5; margin-bottom:8px;">🦅 Guida Suprema dello Stato & Controllo Istituzionale</h4>
-              <div style="font-size:15px; font-weight:900; color:#fff; margin-bottom:4px;">Capo del Regime: ${game.leader.name}</div>
+              <div style="font-size:15px; font-weight:900; color:#fff; margin-bottom:4px;">Capo del Regime: ${polLink('player_leader_pol', game.leader.name)}</div>
               <div style="font-size:11.5px; color:var(--gold-lt); margin-bottom:8px;">Assetto: <strong>${game.dictatorshipName}</strong> (Quirinale esautorato)</div>
               <p style="margin-bottom:10px;">
-                Le prerogative del Presidente della Repubblica (${game.president.name}) sono state sospese dal Consiglio Supremo.<br>
+                Le prerogative del Presidente della Repubblica (${polLink(game.president.name)}) sono state sospese dal Consiglio Supremo.<br>
                 • Partiti messi fuori legge dal Regime: <strong style="color:#fca5a5;">${game.outlawedParties.length}</strong><br>
                 • Rischio Rivolta Popolare: <strong style="color:${game.revoltRisk>=60?'#ef4444':'#fde047'};">${game.revoltRisk}%</strong>
               </p>
@@ -1575,27 +1657,29 @@ export function renderParlTab() {
             ` : `
               <h4 style="color:var(--gold-lt); margin-bottom:8px;">👑 Colle del Quirinale & Presidenza della Repubblica</h4>
               <div style="font-size:15px; font-weight:900; color:#fff; margin-bottom:3px;">
-                Presidente in carica: ${game.president.name} (${game.president.age}a) ${game.president.isPlayer ? '<span style="background:var(--gold); color:#000; font-size:10px; padding:2px 6px; border-radius:4px; margin-left:4px;">👑 SEI TU IL CAPO DELLO STATO</span>' : ''}
+                Presidente della Repubblica: ${polLink(game.president.name)} (${game.president.age}a) ${game.president.isPlayer ? '<span style="background:var(--gold); color:#000; font-size:10px; padding:2px 6px; border-radius:4px; margin-left:4px;">👑 SEI TU IL PRESIDENTE DELLA REPUBBLICA</span>' : ''}
               </div>
               <div style="font-size:11.5px; color:var(--gold-lt); margin-bottom:6px;">Ordinamento: <strong>${curStateForm.icon} ${curStateForm.name}</strong> • Scadenza: <strong>${fmtDate(game.president.endDate)}</strong></div>
-              <p style="margin-bottom:8px;">Area: <strong>${game.president.area}</strong> • Fiducia Istituzionale: <strong>${game.president.trust}%</strong></p>
+              <p style="margin-bottom:8px;">Ruolo Istituzionale: <strong>${game.president.area}</strong> • Fiducia Istituzionale: <strong>${game.president.trust}%</strong></p>
               <div class="p-bar" style="margin-bottom:12px;"><div class="p-fill" style="width:${game.president.trust}%; background:var(--gold);"></div></div>
               ${!game.isImprisoned ? `
                 ${game.president.isPlayer ? `
                   <div style="background:rgba(212,175,55,0.12); border:1px solid var(--gold); border-radius:8px; padding:10px; margin-bottom:8px;">
-                    <div style="font-size:12px; font-weight:800; color:var(--gold-lt); margin-bottom:6px;">🦅 Prerogative Costituzionali del Presidente della Repubblica (${game.leader.name}):</div>
+                    <div style="font-size:12px; font-weight:800; color:var(--gold-lt); margin-bottom:6px;">
+                      🦅 ${isPresidential ? `Poteri Esecutivi del Presidente della Repubblica (${game.leader.name}):` : `Prerogative Costituzionali del Presidente della Repubblica (${game.leader.name}):`}
+                    </div>
                     <div style="display:flex; flex-direction:column; gap:6px;">
-                      <button class="btn btn-m" onclick="quirinalePlayerAction('moral_suasion')">🎙️ Monito del Colle & Moral Suasion (15 ⚡ → +5% Prestigio, +8% Stab., -6 pt Spread)</button>
-                      <button class="btn" onclick="quirinalePlayerAction('remand')">📜 Rinvia Legge alle Camere ex Art. 74 Cost. (20 ⚡ → +8% Fiducia Colle, +6% Prestigio)</button>
-                      <button class="btn btn-w" onclick="quirinalePlayerAction('consult')">🏛️ Convoca il Premier ${game.currentPM} al Quirinale per un Rimpasto (25 ⚡)</button>
-                      <button class="btn btn-r" onclick="quirinalePlayerAction('dissolve')">🗳️ Sciogli le Camere ex Art. 88 Cost. e Indici Elezioni (35 ⚡)</button>
+                      <button class="btn btn-m" onclick="quirinalePlayerAction('moral_suasion')">🎙️ ${isPresidential ? 'Messaggio Presidenziale alla Nazione (15 ⚡ → +5% Prestigio, +8% Stab., -6 pt Spread)' : 'Monito del Colle & Moral Suasion (15 ⚡ → +5% Prestigio, +8% Stab., -6 pt Spread)'}</button>
+                      <button class="btn" onclick="quirinalePlayerAction('remand')">📜 ${isPresidential ? 'Poni Veto Sospensivo Presidenziale su Legge del Parlamento (20 ⚡)' : 'Rinvia Legge alle Camere ex Art. 74 Cost. (20 ⚡ → +8% Fiducia Colle, +6% Prestigio)'}</button>
+                      <button class="btn btn-w" onclick="quirinalePlayerAction('consult')">🏛️ ${isPresidential ? 'Nomina / Revoca Direttamente i Ministri del Gabinetto Presidenziale (25 ⚡)' : `Convoca il Premier ${game.currentPM} al Quirinale per un Rimpasto (25 ⚡)`}</button>
+                      ${!isPresidential ? `<button class="btn btn-r" onclick="quirinalePlayerAction('dissolve')">🗳️ Sciogli le Camere ex Art. 88 Cost. e Indici Elezioni (35 ⚡)</button>` : ''}
                     </div>
                   </div>
                 ` : `
                   <div style="display:flex; flex-direction:column; gap:8px;">
                     <button class="btn" onclick="quirinaleAudienceAction()">🤝 Udienza Riservata al Colle (15 ⚡ → +8% Fiducia Quirinale)</button>
                     <button class="btn btn-w" onclick="${game.stateForm === 'presidenziale' ? 'openDirectPresidentialElectionModal()' : 'openQuirinaleBallotModal(1)'}">
-                      🗳️ ${game.stateForm === 'presidenziale' ? 'Indici Elezione Diretta del Presidente della Repubblica' : 'Convoca Seduta Comune per Elezione del Quirinale (Puoi candidarti!)'}
+                      🗳️ ${game.stateForm === 'presidenziale' ? 'Indici Elezione Diretta del Presidente della Repubblica' : 'Convoca Seduta Comune per Elezione del Presidente della Repubblica'}
                     </button>
                   </div>
                 `}
@@ -1657,7 +1741,12 @@ export function updateAllUI() {
         logoEl.onclick = () => { if (p.id !== 'ind') openPartyInspectorModal(p.id); };
       }
       const leaderEl = document.getElementById('topLeader');
-      if (leaderEl) leaderEl.innerText = `${game.leader.name} (${game.leader.age}a)`;
+      if (leaderEl) {
+        leaderEl.innerText = `${game.leader.name} (${game.leader.age}a)`;
+        leaderEl.style.cursor = 'pointer';
+        leaderEl.title = `Clicca per aprire la tua scheda politica e carriera`;
+        leaderEl.onclick = () => openPoliticianCardModal(game.leader.name);
+      }
 
       // Punto 9 & Punto 17 v6.2: Badge di ruolo in alto mostra Presidente della Repubblica o Ministro se ricopri quella carica!
       const roleEl = document.getElementById('topRole');
@@ -1673,7 +1762,7 @@ export function updateAllUI() {
           roleEl.innerText = '👑 Presidente della Repubblica';
         } else if (game.currentPM === game.leader.name && p.inGov) {
           roleEl.className = 'pill-role r-pm';
-          roleEl.innerText = '👑 Presidente del Consiglio';
+          roleEl.innerText = game.stateForm === 'cancellierato' ? '🏛️ Cancelliere Federale' : '👑 Presidente del Consiglio';
         } else if (myMin) {
           roleEl.className = 'pill-role r-gov';
           roleEl.innerText = `🏛️ Ministro: ${myMin.ministry.name.replace(/^[^\s]+\s/, '')}`;
@@ -1691,7 +1780,7 @@ export function updateAllUI() {
 
       const subEl = document.getElementById('topSub');
       if (subEl) {
-        const offTxt = game.president.isPlayer ? ' • 👑 Capo dello Stato (Quirinale)' : (myMin ? ` • 💼 Titolare ${myMin.ministry.name}` : '');
+        const offTxt = game.president.isPlayer ? ' • 👑 Presidente della Repubblica (Quirinale)' : (myMin ? ` • 💼 Titolare ${myMin.ministry.name}` : '');
         const rTxt = game.isImprisoned
           ? 'Ex-Leader Detenuto (Partito sciolto per eversione)'
           : (isInd ? 'Personalità Indipendente' : (isSec ? `Segretario di ${p.name}` : `Capocorrente in ${p.name} (Segr: ${p.leader})`));
@@ -1767,29 +1856,43 @@ export function updateAllUI() {
         if (rt) rt.innerText = `${game.revoltRisk}%`;
       }
 
-      // Left Sidebar Polls: TOCCANDO QUALSIASI PARTITO SI APRE SUBITO IL MENU DEL PARTITO (PUNTO 6 v6.2)!
+      // Left Sidebar Polls: Scala dinamica (Punto 20) + nome del leader cliccabile (Punto 5) + scheda partito cliccabile!
       const pollsBox = document.getElementById('pollsBox');
       if (pollsBox) {
         const sortedP = [...game.parties].sort((a,b) => b.poll - a.poll);
-        pollsBox.innerHTML = sortedP.map(x => `
-          <div class="poll-r" title="Clicca per aprire la scheda completa di ${x.name}" style="cursor:pointer; ${x.id===p.id && !isInd ? 'background:rgba(226,185,59,0.12); border:1px solid var(--gold-bd);' : ''}" onclick="openPartyInspectorModal('${x.id}')">
-            <div class="poll-h">
-              <span class="poll-id" style="color:${x.id===p.id && !isInd ? 'var(--gold-lt)' : 'var(--txt)'};">
-                <span class="mini-svg">${getPartySVG(x.id, x.short, x.color)}</span>
-                <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${x.short} — ${x.leader} ${x.inGov?'🟢':''}</span>
-              </span>
-              <strong style="white-space:nowrap;">${x.poll.toFixed(1)}% <span style="font-size:10px; color:var(--muted);">(${x.seats}s)</span></strong>
+        const maxPollVal = Math.max(...sortedP.map(x => x.poll || 0), 35);
+        const maxScale = Math.max(40, Math.ceil(maxPollVal / 10) * 10);
+        pollsBox.innerHTML = sortedP.map(x => {
+          const fillW = Math.min(100, Math.max(2.5, (x.poll / maxScale) * 100)).toFixed(1);
+          return `
+            <div class="poll-r" title="Clicca per aprire la scheda completa di ${x.name}" style="cursor:pointer; ${x.id===p.id && !isInd ? 'background:rgba(226,185,59,0.12); border:1px solid var(--gold-bd);' : ''}" onclick="openPartyInspectorModal('${x.id}')">
+              <div class="poll-h">
+                <span class="poll-id" style="color:${x.id===p.id && !isInd ? 'var(--gold-lt)' : 'var(--txt)'};">
+                  <span class="mini-svg">${getPartySVG(x.id, x.short, x.color)}</span>
+                  <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${x.short} — ${polLink(x.leader)} ${x.inGov?'<span title="Partito al Governo">🟢</span>':''}</span>
+                </span>
+                <strong style="white-space:nowrap;">${x.poll.toFixed(1)}% <span style="font-size:10px; color:var(--muted);">(${x.seats}s)</span></strong>
+              </div>
+              <div class="p-bar"><div class="p-fill" style="width:${fillW}%; background:${x.color}; box-shadow:0 0 6px ${x.color}88;"></div></div>
             </div>
-            <div class="p-bar"><div class="p-fill" style="width:${Math.min(100, Math.max(3, x.poll * 2.8))}%; background:${x.color}; box-shadow:0 0 6px ${x.color}88;"></div></div>
-          </div>
-        `).join('');
+          `;
+        }).join('');
       }
 
-      // Quirinale Box
+      // Quirinale Box (Punto 5 & Punto 6: mai mostrare vecchia carica ministeriale sotto il Presidente della Repubblica)
       const qName = document.getElementById('qName');
-      if (qName) qName.innerText = game.isDictatorship ? `${game.president.name} (Esautorato)` : `${game.president.name} (${game.president.age}a)${game.president.isPlayer?' [TU]':''}`;
+      if (qName) {
+        qName.innerHTML = game.isDictatorship
+          ? `${polLink(game.president.name)} (Esautorato)`
+          : `${polLink(game.president.name)} (${game.president.age}a)${game.president.isPlayer ? ' <span style="color:var(--gold-lt);">[TU]</span>' : ''}`;
+      }
       const qArea = document.getElementById('qArea');
-      if (qArea) qArea.innerText = game.isDictatorship ? 'Prerogative sospese dal Regime' : game.president.area;
+      if (qArea) {
+        const cleanArea = (game.president.area && !/^Ministro\b/i.test(game.president.area))
+          ? game.president.area
+          : 'Garante della Costituzione';
+        qArea.innerText = game.isDictatorship ? 'Prerogative sospese dal Regime' : cleanArea;
+      }
       const qEnd = document.getElementById('qEnd');
       if (qEnd) qEnd.innerText = fmtDate(game.president.endDate);
       const qTrust = document.getElementById('qTrust');
@@ -1813,21 +1916,24 @@ export function updateAllUI() {
               <span>${data.poll.toFixed(1)}% (${data.seats} seggi)</span>
             </div>
             <div style="font-size:10.5px; color:var(--muted); margin-top:4px; display:flex; flex-wrap:wrap; gap:4px;">
-              ${data.parties.map(pt => `<span style="cursor:pointer; color:${pt.color}; font-weight:800; background:rgba(255,255,255,0.04); padding:1px 5px; border-radius:4px; border:1px solid ${pt.color}55;" onclick="openPartyInspectorModal('${pt.id}')" title="Ispeziona ${pt.name}">${pt.short}</span>`).join('')}
+              ${data.parties.map(pt => `<span style="cursor:pointer; color:${pt.color}; font-weight:800; background:rgba(255,255,255,0.04); padding:1px 5px; border-radius:4px; border:1px solid ${pt.color}55;" onclick="openPartyInspectorModal('${pt.id}')" title="Ispeziona ${pt.name}">${pt.short}${pt.inGov ? ' 🟢' : ''}</span>`).join('')}
             </div>
           </div>
         `).join('');
       }
 
-      // Right Sidebar KPIs
+      // Right Sidebar KPIs (Punto 5, Punto 7 & Punto 21: cliccabilità nomi + Presidente della Repubblica + adattamento forma di Stato)
       const rightKpis = document.getElementById('rightKpis');
       if (rightKpis) {
+        const isPresForm = (game.stateForm === 'presidenziale');
+        const pmTitle = game.isDictatorship ? 'Capo del Regime:' : (game.stateForm === 'cancellierato' ? 'Cancelliere Federale:' : (game.stateForm === 'premierato' ? 'Premier Eletto:' : 'Presidente del Consiglio:'));
+        const senTitle = game.stateForm === 'federale' ? 'Pres. Senato delle Regioni:' : 'Pres. Senato:';
         rightKpis.innerHTML = `
-          <div>👑 <strong>Capo dello Stato:</strong> ${game.president.name}${game.president.isPlayer ? ' <span style="color:var(--gold-lt);">(TU)</span>' : ''}</div>
-          <div>🏛️ <strong>${game.isDictatorship ? 'Capo del Regime:' : 'Premier:'}</strong> ${game.currentPM}</div>
+          <div>👑 <strong>${isPresForm ? 'Presidente Repubblica & Esecutivo:' : 'Presidente della Repubblica:'}</strong> ${polLink(game.president.name)}${game.president.isPlayer ? ' <span style="color:var(--gold-lt);">(TU)</span>' : ''}</div>
+          ${!isPresForm ? `<div>🏛️ <strong>${pmTitle}</strong> ${polLink(game.currentPM)}</div>` : ''}
           ${myMin ? `<div>💼 <strong>Tuo Dicastero:</strong> <span style="color:#34d399; font-weight:800;">${myMin.ministry.name}</span></div>` : ''}
-          <div>🪑 <strong>Pres. Senato:</strong> ${game.senateSpeaker?.name || 'Ignazio La Russa'}</div>
-          <div>🔔 <strong>Pres. Camera:</strong> ${game.chamberSpeaker?.name || 'Lorenzo Fontana'}</div>
+          <div>🪑 <strong>${senTitle}</strong> ${polLink(game.senateSpeaker?.name || 'Ignazio La Russa')}</div>
+          <div>🔔 <strong>Pres. Camera:</strong> ${polLink(game.chamberSpeaker?.name || 'Lorenzo Fontana')}</div>
           <div>📜 <strong>Ordinamento:</strong> ${game.isDictatorship ? '🦅 ' + game.dictatorshipName : stateFormObj.icon + ' ' + stateFormObj.name}</div>
           <div>🌍 <strong>Relazioni Esteri:</strong> 🇺🇸 ${Math.round(game.foreignRels.usa||0)} • 🇪🇺 ${Math.round(game.foreignRels.eu_com||0)} • 🇺🇦 ${Math.round(game.foreignRels.ukraine||0)} • 🇷🇺 ${Math.round(game.foreignRels.russia||0)}</div>
         `;
@@ -1858,26 +1964,40 @@ export function openPoliticianCardModal(polId) {
   let target = null;
   const isPlayer = (polId === 'player_leader_pol' || polId === 'player' || polId === game.leader.name);
   if (isPlayer) {
-    const p = getP();
+    const pPol = ensurePlayerInPoliticians();
+    const mergedHistory = [];
+    const seenH = new Set();
+    [
+      ...(Array.isArray(game.leader.history) ? game.leader.history : []),
+      ...(pPol && Array.isArray(pPol.history) ? pPol.history : []),
+      ...(Array.isArray(game.politicianHistoryMap?.[pPol?.id || 'player_leader_pol']) ? game.politicianHistoryMap[pPol?.id || 'player_leader_pol'] : [])
+    ].forEach(h => {
+      if (h && !seenH.has(h)) {
+        seenH.add(h);
+        mergedHistory.push(h);
+      }
+    });
+    if (mergedHistory.length === 0) {
+      mergedHistory.push(
+        `Guida politica di ${game.partyRole === 'independent' ? 'Movimento Civico Indipendente' : (game.parties.find(x => x.id === game.playerPartyId)?.name || 'Partito')}`,
+        'Protagonista della legislatura corrente'
+      );
+    }
     target = {
-      id: 'player_leader_pol',
+      id: pPol ? pPol.id : 'player_leader_pol',
       name: game.leader.name,
       age: game.leader.age || 49,
       gender: game.leader.gender || 'M',
       region: game.leader.region || 'Lazio',
       partyId: (game.partyRole === 'independent' ? 'ind' : game.playerPartyId),
-      role: (game.partyRole === 'secretary' ? 'Segretario Nazionale' : (game.partyRole === 'member' ? 'Membro / Capocorrente' : 'Leader Indipendente')),
-      pref: 'governo',
-      comp: 88,
+      role: (game.president?.isPlayer ? 'Presidente della Repubblica' : (game.currentPM === game.leader.name ? 'Presidente del Consiglio' : (game.partyRole === 'secretary' ? 'Segretario Nazionale' : (game.partyRole === 'member' ? 'Membro / Capocorrente' : 'Leader Indipendente')))),
+      pref: pPol?.pref || 'governo',
+      comp: pPol?.comp || 88,
       clout: game.leader.prestige || 80,
       loyalty: 100,
       compass: game.leader.compass || { economic: 0.0, social: 0.0, ideoScore: game.leader.personalIdeo || 2.0 },
       bio: `Leader politico protagonista della vita parlamentare italiana. Prestigio personale: ${game.leader.prestige || 75}%, fiducia interna dei militanti: ${game.leader.internalSupport || 75}%.`,
-      history: [
-        'Protagonista della legislatura corrente',
-        `Guida politica di ${game.partyRole === 'independent' ? 'Movimento Civico Indipendente' : (game.parties.find(x => x.id === game.playerPartyId)?.name || 'Partito')}`,
-        ...(game.currentPM === game.leader.name ? ['Presidente del Consiglio dei Ministri in carica'] : [])
-      ]
+      history: mergedHistory
     };
   } else {
     target = getPoliticianById(polId);
@@ -1919,12 +2039,39 @@ export function openPoliticianCardModal(polId) {
         };
       }
     }
+    // Punto 1 & Punto 16c: Sincronizza sempre lo stato dinamico della partita (partito dopo scissioni, ruolo attuale e storico incarichi)
+    if (target) {
+      if (game.politicianPartyMap && game.politicianPartyMap[target.id]) {
+        target.partyId = game.politicianPartyMap[target.id];
+      }
+      if (game.politicianRoleMap && game.politicianRoleMap[target.id]) {
+        target.role = game.politicianRoleMap[target.id];
+      }
+      if (game.politicianHistoryMap && Array.isArray(game.politicianHistoryMap[target.id]) && game.politicianHistoryMap[target.id].length > 0) {
+        const merged = [];
+        const seen = new Set();
+        [...game.politicianHistoryMap[target.id], ...(target.history || [])].forEach(h => {
+          if (h && !seen.has(h)) {
+            seen.add(h);
+            merged.push(h);
+          }
+        });
+        target.history = merged;
+      }
+    }
   }
 
   const pt = game.parties.find(x => x.id === target.partyId);
   const partyColor = pt ? pt.color : '#38bdf8';
   const partyName = pt ? `${pt.name} (${pt.short})` : (target.partyId === 'tech' ? 'Tecnico Indipendente' : 'Indipendente');
-  const curOffice = getPersonCurrentOffice(target.name) || 'Nessun dicastero (Membro dell\'Assemblea)';
+  const activeOffice = getPersonCurrentOffice(target.name);
+  const curOffice = activeOffice || target.role || 'Membro dell\'Assemblea';
+
+  // Assicura che l'incarico istituzionale attuale sia sempre visibile in cima al Curriculum dinamico (Punto 1)
+  const displayHistory = Array.isArray(target.history) ? [...target.history] : [];
+  if (activeOffice && !displayHistory.some(h => h.toLowerCase().includes(activeOffice.toLowerCase().slice(0, 18)))) {
+    displayHistory.unshift(`In carica (${fmtDate(game.date)}): ${activeOffice}`);
+  }
 
   let rawEcon = 0.0, rawSoc = 0.0;
   if (Array.isArray(target.ideo) && target.ideo.length >= 2) {
@@ -2044,12 +2191,12 @@ export function openPoliticianCardModal(polId) {
       </div>
     </div>
 
-    <!-- CURRICULUM E STORICO DEGLI INCARICHI -->
+    <!-- CURRICULUM E STORICO DEGLI INCARICHI (Punto 1: dinamico e sempre aggiornato durante la partita) -->
     <div class="box" style="margin-bottom:8px;">
       <h4 style="color:var(--gold-lt); margin-bottom:4px;">📜 Curriculum & Storico Istituzionale</h4>
       <ul style="margin:0; padding-left:18px; font-size:11.5px; color:var(--muted); line-height:1.6;">
-        ${(target.history && target.history.length > 0)
-          ? target.history.map(h => `<li><span style="color:#fff;">${h}</span></li>`).join('')
+        ${(displayHistory && displayHistory.length > 0)
+          ? displayHistory.map((h, i) => `<li><span style="color:${i === 0 ? 'var(--gold-lt)' : '#fff'}; font-weight:${i === 0 ? '800' : '500'};">${h}</span></li>`).join('')
           : `<li><span style="color:#fff;">Militanza politica e impegno civico sul territorio regionale (${target.region || 'Italia'}).</span></li><li><span style="color:#fff;">Eletto nelle assemblee legislative ed esecutive della Repubblica.</span></li>`
         }
       </ul>
@@ -2078,6 +2225,11 @@ export function openPartyInspectorModal(partyId) {
       const sameCoal = (!isInd && target.coalId !== 'none' && target.coalId === p.coalId);
       const coalLead = (!isInd && p.coalId !== 'none') ? getCoalLeaderParty(p.coalId) : null;
       const isCoalLeader = (!isInd && coalLead && coalLead.id === p.id);
+      const coalMembers = target.coalId && target.coalId !== 'none'
+        ? game.parties.filter(x => x.coalId === target.coalId)
+        : [target];
+      const coalSeats = coalMembers.reduce((s, x) => s + (x.seats || 0), 0);
+      const coalPoll = coalMembers.reduce((s, x) => s + (x.poll || 0), 0);
 
       const factions = target.factions || [
         { name:`Area Maggioritaria (${target.leader})`, leader:target.leader, share:58, desc:"Corrente guida della segreteria." },
@@ -2085,22 +2237,26 @@ export function openPartyInspectorModal(partyId) {
         { name:"Circoli Territoriali", leader:"Amministratori Locali", share:14, desc:"Base militante regionale." }
       ];
 
-      const partyPols = POLITICIANS.filter(x => x.partyId === target.id);
+      // Punto 16a & 16c: Considera anche eventuali trasferimenti registrati in politicianPartyMap
+      const partyPols = POLITICIANS.filter(x => {
+        const curPid = (game.politicianPartyMap && game.politicianPartyMap[x.id]) ? game.politicianPartyMap[x.id] : x.partyId;
+        return curPid === target.id;
+      });
       const otherMajor = game.parties.filter(x => x.id !== target.id).sort((a,b)=>b.poll-a.poll).slice(0, 8);
 
       const bodyEl = document.getElementById('piBody');
       if (!bodyEl) return;
 
       bodyEl.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; padding-bottom:10px; border-bottom:1px solid var(--border); margin-bottom:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; padding-bottom:10px; border-bottom:1px solid var(--border); margin-bottom:10px;">
           <div style="display:flex; align-items:center; gap:12px;">
             <div style="width:48px; height:48px; flex-shrink:0;">${getPartySVG(target.id, target.short, target.color)}</div>
             <div>
               <div style="font-size:10px; font-weight:900; color:var(--gold-lt); letter-spacing:0.8px;">ISPETTORE STRUTTURA PARTITO • ${coalName.toUpperCase()}</div>
-              <h3 style="margin:2px 0; font-size:19px; color:${target.color};">${target.name} (${target.short}) ${target.inGov ? '🟢 [Al Governo]' : '🔴 [Opposizione]'}</h3>
+              <h3 style="margin:2px 0; font-size:19px; color:${target.color};">${target.name} (${target.short}) ${target.inGov ? '🟢 [Al Governo]' : '🔴 [All\'Opposizione]'}</h3>
               <div style="font-size:11.5px; color:var(--muted);">
-                Segretario Nazionale: <strong style="color:#fff; cursor:pointer;" onclick="openPoliticianCardModal('${target.leader}')" title="Visualizza scheda di ${target.leader}">${target.leader} (${target.leaderAge}a) 🔍</strong> •
-                Capocorrente: <strong style="color:#fde047; cursor:pointer;" onclick="openPoliticianCardModal('${target.wingLeader || ''}')" title="Visualizza scheda di ${target.wingLeader || 'Capocorrente'}">${target.wingLeader || 'N/D'} 🔍</strong> •
+                Segretario Nazionale: ${polLink(target.leader, `${target.leader} (${target.leaderAge}a) 🔍`)} •
+                Capocorrente: ${target.wingLeader ? polLink(target.wingLeader, `${target.wingLeader} 🔍`, 'color:#fde047;') : '<strong>N/D</strong>'} •
                 Collocazione: <strong>${getIdeoLabel(getPartyIdeoScore(target))}</strong>
               </div>
             </div>
@@ -2111,6 +2267,28 @@ export function openPartyInspectorModal(partyId) {
               <div style="font-size:10.5px; color:var(--muted);">${target.seats} Deputati su 400</div>
             </div>
             <button class="btn" onclick="closePartyInspectorModal()">✖ Chiudi</button>
+          </div>
+        </div>
+
+        <!-- PUNTO 14: RIQUADRO ESPLICITO SULLA COALIZIONE ATTUALE E COLLOCAZIONE PARLAMENTARE DEL PARTITO -->
+        <div class="box" style="background:rgba(15,23,42,0.75); border:1px solid ${target.inGov ? 'rgba(16,185,129,0.5)' : 'rgba(56,189,248,0.4)'}; margin-bottom:10px; padding:9px 12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <div>
+              <span style="font-size:10.5px; font-weight:900; color:var(--muted); text-transform:uppercase; letter-spacing:0.6px;">🤝 Coalizione Attuale:</span>
+              <strong style="color:var(--gold-lt); font-size:13px; margin-left:6px;">${coalName}</strong>
+              <span style="font-size:11px; color:var(--muted); margin-left:6px;">(${coalPoll.toFixed(1)}% • ${coalSeats}/400 seggi)</span>
+            </div>
+            <span style="font-size:11px; font-weight:900; padding:3px 9px; border-radius:999px; background:${target.inGov ? 'rgba(16,185,129,0.18)' : 'rgba(239,68,68,0.18)'}; color:${target.inGov ? '#34d399' : '#f87171'}; border:1px solid ${target.inGov ? '#10b98166' : '#ef444466'};">
+              ${target.inGov ? '🏛️ Partito di Maggioranza (Al Governo)' : '⚔️ Partito di Opposizione Parlamentare'}
+            </span>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:6px; font-size:11px;">
+            <span style="color:var(--muted);">Forze della Coalizione:</span>
+            ${coalMembers.map(cm => `
+              <span style="cursor:pointer; display:inline-flex; align-items:center; gap:4px; background:var(--bg-0); border:1px solid ${cm.color}88; padding:2px 7px; border-radius:5px; font-weight:800; color:${cm.color};" onclick="openPartyInspectorModal('${cm.id}')" title="Apri scheda di ${cm.name}">
+                ${cm.short} <span style="color:#fff; font-weight:600;">(${cm.poll.toFixed(1)}% • ${cm.seats}s)</span>
+              </span>
+            `).join('')}
           </div>
         </div>
 
@@ -2158,7 +2336,7 @@ export function openPartyInspectorModal(partyId) {
               ${factions.map((f, idx) => `
                 <div style="background:var(--bg-1); padding:6px 8px; border-radius:6px; border-left:3px solid ${idx===0?target.color:(idx===1?'#fde047':'#38bdf8')}; font-size:11px;">
                   <div style="display:flex; justify-content:space-between;">
-                    <strong>${idx===0?'👑':'⚔️'} ${f.name} (<em>${f.leader}</em>)</strong>
+                    <strong>${idx===0?'👑':'⚔️'} ${f.name} (<em>${polLink(f.leader)}</em>)</strong>
                     <strong style="color:var(--gold-lt);">${f.share}%</strong>
                   </div>
                   <div style="font-size:10px; color:var(--muted);">${f.desc}</div>
@@ -2167,7 +2345,7 @@ export function openPartyInspectorModal(partyId) {
             </div>
             ${partyPols.length > 0 ? `
               <div style="font-size:11px; color:var(--muted);">
-                <strong>Esponenti & Ministri di ${target.short}:</strong>
+                <strong>Esponenti & Ministri di ${target.short} (${partyPols.length}):</strong>
                 <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px;">
                   ${partyPols.map(pol => {
                     const off = getPersonCurrentOffice(pol, null, false);
@@ -2189,7 +2367,7 @@ export function openPartyInspectorModal(partyId) {
                 return `
                   <div style="background:var(--bg-1); padding:5px 8px; border-radius:6px; font-size:11px; cursor:pointer;" onclick="openPartyInspectorModal('${o.id}')">
                     <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
-                      <span><strong style="color:${o.color};">${o.short}</strong> (${o.leader}) ${o.coalId===target.coalId && target.coalId!=='none' ? '🤝 Alleato' : ''}</span>
+                      <span><strong style="color:${o.color};">${o.short}</strong> (${polLink(o.leader)}) ${o.coalId===target.coalId && target.coalId!=='none' ? '🤝 Alleato' : ''}</span>
                       <strong style="color:${barC};">Affinità ${c.total}% (Rel. ${c.rel}%) ${c.hasVeto?'⛔':''}</strong>
                     </div>
                     <div class="p-bar" style="height:5px;"><div class="p-fill" style="width:${c.total}%; background:${barC};"></div></div>
@@ -2286,9 +2464,28 @@ export function openGameSelectForElement(selEl) {
       }
       titleEl.innerText = `🏛️ ${labelTxt}`;
 
+      // PUNTO 11: Placeholder di ricerca contestuale in base al menu aperto (mai scrivere "cerca politico, partito o voce" ovunque!)
+      if (searchEl) {
+        const sid = (selEl.id || '').toLowerCase();
+        const llow = labelTxt.toLowerCase();
+        if (sid.includes('dossier') || llow.includes('dossier') || llow.includes('tema') || llow.includes('riforma')) {
+          searchEl.placeholder = '🔍 Cerca dossier o tema programmatico...';
+        } else if (sid.includes('bloc') || llow.includes('bacino') || llow.includes('categoria') || llow.includes('elettoral')) {
+          searchEl.placeholder = '🔍 Cerca categoria o bacino sociale...';
+        } else if (sid.includes('reg') || llow.includes('region')) {
+          searchEl.placeholder = '🔍 Cerca regione italiana...';
+        } else if (sid.includes('party') || sid.includes('partit') || llow.includes('partito')) {
+          searchEl.placeholder = '🔍 Cerca partito politico...';
+        } else if (sid.includes('pol') || sid.includes('min') || sid.includes('cand') || llow.includes('politico') || llow.includes('ministro') || llow.includes('candidato') || llow.includes('presidente')) {
+          searchEl.placeholder = '🔍 Cerca politico, candidato o esponente...';
+        } else {
+          searchEl.placeholder = '🔍 Cerca opzione nell\'elenco...';
+        }
+        searchEl.value = '';
+      }
+
       const hasMany = selEl.options.length > 5;
       if (searchWrap) searchWrap.style.display = hasMany ? 'block' : 'none';
-      if (searchEl) searchEl.value = '';
 
       renderGameSelectOptions('');
       modalBg.classList.add('open');

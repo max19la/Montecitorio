@@ -6,32 +6,33 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <title>MONTECITORIO (v6.4) — Simulatore Politico</title>
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <title>MONTECITORIO 1.7 — Simulatore Politico Italiano</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg-0: #050811;
-      --bg-1: #0b1220;
-      --bg-2: #131d31;
-      --bg-3: #1c2a46;
-      --gold: #e2b93b;
-      --gold-lt: #fde047;
-      --gold-bd: rgba(226, 185, 59, 0.35);
+      --bg-0: #040710;
+      --bg-1: #0a1020;
+      --bg-2: #111a30;
+      --bg-3: #192644;
+      --gold: #e5b842;
+      --gold-lt: #fde68a;
+      --gold-bd: rgba(229, 184, 66, 0.38);
       --party-color: #2563eb;
       --party-rgb: 37, 99, 235;
-      --party-glow: rgba(var(--party-rgb), 0.32);
-      --party-soft: rgba(var(--party-rgb), 0.14);
-      --party-border: rgba(var(--party-rgb), 0.55);
+      --party-glow: rgba(var(--party-rgb), 0.36);
+      --party-soft: rgba(var(--party-rgb), 0.16);
+      --party-border: rgba(var(--party-rgb), 0.58);
       --it-g: #009246;
       --it-w: #f8fafc;
       --it-r: #ce2b37;
       --txt: #f8fafc;
       --muted: #cbd5e1;
-      --acc: #3b82f6;
+      --acc: #38bdf8;
       --ok: #10b981;
       --err: #ef4444;
       --warn: #f59e0b;
-      --bd: rgba(255, 255, 255, 0.12);
+      --bd: rgba(255, 255, 255, 0.11);
+      --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.14);
     }
 
     *, *::before, *::after {
@@ -40,15 +41,24 @@
       padding: 0;
     }
 
+    /* Custom Scrollbars for Modern Dashboard Feel */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(4, 7, 16, 0.6); border-radius: 99px; }
+    ::-webkit-scrollbar-thumb { background: rgba(229, 184, 66, 0.35); border-radius: 99px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(229, 184, 66, 0.65); }
+
     body {
       font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
       font-size: 14px;
       line-height: 1.5;
       background-color: var(--bg-0);
       background-image:
-        radial-gradient(circle at 12% 8%, rgba(var(--party-rgb), 0.38) 0%, transparent 48%),
-        radial-gradient(circle at 88% 85%, rgba(var(--party-rgb), 0.24) 0%, transparent 55%),
-        radial-gradient(circle at 50% 0%, #152238 0%, var(--bg-0) 78%);
+        radial-gradient(circle at 10% 6%, rgba(var(--party-rgb), 0.34) 0%, transparent 44%),
+        radial-gradient(circle at 90% 88%, rgba(229, 184, 66, 0.14) 0%, transparent 48%),
+        radial-gradient(circle at 50% 0%, #14223d 0%, var(--bg-0) 76%),
+        linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 100% 100%, 36px 36px, 36px 36px;
       background-attachment: fixed;
       color: var(--txt);
       min-height: 100vh;
@@ -56,17 +66,17 @@
       transition: background-image 0.5s ease, background-color 0.5s ease;
     }
 
-    /* TEMA BIANCO ISTITUZIONALE PER GLI INDIPENDENTI (PUNTO 15) */
+    /* TEMA BIANCO ISTITUZIONALE PER GLI INDIPENDENTI */
     body.theme-ind {
-      background-color: #0f172a;
+      background-color: #0b1120;
       background-image:
-        radial-gradient(circle at 15% 10%, rgba(255, 255, 255, 0.28) 0%, transparent 50%),
-        radial-gradient(circle at 85% 85%, rgba(248, 250, 252, 0.22) 0%, transparent 55%),
-        radial-gradient(circle at 50% 0%, #1e293b 0%, #090d16 80%);
+        radial-gradient(circle at 15% 10%, rgba(255, 255, 255, 0.25) 0%, transparent 50%),
+        radial-gradient(circle at 85% 85%, rgba(248, 250, 252, 0.18) 0%, transparent 55%),
+        radial-gradient(circle at 50% 0%, #1e293b 0%, #070b14 80%);
     }
     body.theme-ind .glass {
       border-top-color: #ffffff;
-      box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5), 0 0 24px rgba(255, 255, 255, 0.12);
+      box-shadow: var(--glass-highlight), 0 18px 42px rgba(0, 0, 0, 0.55), 0 0 26px rgba(255, 255, 255, 0.1);
     }
     body.theme-ind .btn:not(.btn-w):not(.btn-m):not(.btn-r) {
       background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
@@ -75,7 +85,7 @@
       font-weight: 800;
     }
 
-    /* TEMA DITTATURA / REGIME (PUNTO 17) */
+    /* TEMA DITTATURA / REGIME */
     body.theme-regime {
       background-image:
         radial-gradient(circle at 15% 10%, rgba(185, 28, 28, 0.35) 0%, transparent 50%),
@@ -85,6 +95,22 @@
 
     h1, h2, h3, .serif { font-family: 'Cinzel', Georgia, serif; }
 
+    /* LINK CLICCABILI PER TUTTI I POLITICI (PUNTO 5) */
+    .pol-click-link {
+      cursor: pointer;
+      border-bottom: 1px dashed rgba(253, 230, 138, 0.55);
+      padding: 0 2px;
+      border-radius: 4px;
+      transition: all 0.16s ease;
+    }
+    .pol-click-link:hover {
+      color: var(--gold-lt) !important;
+      background: rgba(229, 184, 66, 0.16);
+      border-bottom-style: solid;
+      border-bottom-color: var(--gold-lt);
+      text-shadow: 0 0 10px rgba(253, 230, 138, 0.45);
+    }
+
     .tricolor {
       height: 5px;
       width: 100%;
@@ -92,41 +118,65 @@
       top: 0; left: 0;
       z-index: 4000;
       background: linear-gradient(90deg, var(--it-g) 0 33.3%, var(--it-w) 33.3% 66.6%, var(--it-r) 66.6% 100%);
-      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+      box-shadow: 0 2px 16px rgba(0, 0, 0, 0.75);
     }
 
     /* SCHERMATA SETUP */
     #setupView {
-      max-width: 1420px;
-      margin: 24px auto;
+      max-width: 1460px;
+      margin: 22px auto;
       padding: 18px;
     }
 
     .hero-box {
-      background: linear-gradient(135deg, rgba(var(--party-rgb), 0.26) 0%, rgba(11, 18, 32, 0.95) 65%, rgba(226, 185, 59, 0.16) 100%);
-      border: 1px solid var(--party-border);
-      border-radius: 18px;
-      padding: 26px 20px;
+      position: relative;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 0%, rgba(229, 184, 66, 0.22) 0%, transparent 65%),
+        linear-gradient(135deg, rgba(var(--party-rgb), 0.28) 0%, rgba(9, 15, 29, 0.96) 55%, rgba(229, 184, 66, 0.18) 100%);
+      border: 1px solid rgba(229, 184, 66, 0.45);
+      border-top: 3px solid var(--gold-lt);
+      border-radius: 22px;
+      padding: 28px 24px;
       text-align: center;
       margin-bottom: 18px;
-      box-shadow: 0 18px 45px rgba(0, 0, 0, 0.55), 0 0 35px var(--party-soft);
+      box-shadow: var(--glass-highlight), 0 22px 55px rgba(0, 0, 0, 0.65), 0 0 40px var(--party-soft);
       transition: all 0.4s ease;
     }
 
-    .hero-box h1 {
-      font-size: clamp(28px, 3.8vw, 44px);
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(229, 184, 66, 0.14);
+      border: 1px solid rgba(229, 184, 66, 0.45);
       color: var(--gold-lt);
-      letter-spacing: 2px;
-      margin-bottom: 4px;
+      font-size: 11px;
       font-weight: 800;
+      letter-spacing: 1.6px;
+      text-transform: uppercase;
+      padding: 4px 14px;
+      border-radius: 999px;
+      margin-bottom: 8px;
+    }
+
+    .hero-box h1 {
+      font-size: clamp(30px, 4vw, 48px);
+      background: linear-gradient(180deg, #ffffff 0%, #fde68a 65%, #d97706 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: 2.5px;
+      margin-bottom: 4px;
+      font-weight: 900;
+      text-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
     }
 
     .hero-box p.hero-sub {
-      font-size: 15px;
-      color: var(--muted);
-      letter-spacing: 1.5px;
+      font-size: 14px;
+      color: #cbd5e1;
+      letter-spacing: 2px;
       text-transform: uppercase;
-      font-weight: 600;
+      font-weight: 700;
     }
 
     .setup-info-bar {
@@ -138,121 +188,132 @@
 
     .setup-grid {
       display: grid;
-      grid-template-columns: 420px 1fr;
+      grid-template-columns: 430px 1fr;
       gap: 20px;
     }
 
     .glass {
-      background: linear-gradient(165deg, rgba(16, 25, 44, 0.92) 0%, rgba(9, 14, 26, 0.95) 100%);
-      border: 1px solid var(--bd);
+      background: linear-gradient(165deg, rgba(16, 25, 46, 0.88) 0%, rgba(8, 13, 25, 0.94) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.12);
       border-top: 3px solid var(--party-color);
-      border-radius: 16px;
+      border-radius: 18px;
       padding: 18px;
-      box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5), 0 0 24px rgba(var(--party-rgb), 0.08);
-      backdrop-filter: blur(14px);
-      transition: border-color 0.4s ease, box-shadow 0.4s ease;
+      box-shadow: var(--glass-highlight), 0 18px 42px rgba(0, 0, 0, 0.55), 0 0 28px rgba(var(--party-rgb), 0.08);
+      backdrop-filter: blur(20px) saturate(150%);
+      -webkit-backdrop-filter: blur(20px) saturate(150%);
+      transition: border-color 0.35s ease, box-shadow 0.35s ease;
       min-width: 0;
     }
 
     .sec-hdr {
       font-family: 'Cinzel', serif;
       font-size: 15px;
-      font-weight: 700;
+      font-weight: 800;
       color: var(--gold-lt);
       padding-bottom: 10px;
       margin-bottom: 14px;
-      border-bottom: 1px solid var(--bd);
+      border-bottom: 1px solid rgba(229, 184, 66, 0.22);
       display: flex;
       justify-content: space-between;
       align-items: center;
       flex-wrap: wrap;
       gap: 8px;
+      letter-spacing: 0.4px;
     }
 
     .fld { margin-bottom: 12px; }
     .fld label {
       display: block;
-      font-size: 11.5px;
-      font-weight: 700;
+      font-size: 11px;
+      font-weight: 800;
       text-transform: uppercase;
-      color: var(--muted);
+      color: #94a3b8;
       margin-bottom: 5px;
-      letter-spacing: 0.03em;
+      letter-spacing: 0.05em;
     }
 
     input, select {
       width: 100%;
-      padding: 10px 12px;
-      background: var(--bg-2);
+      padding: 10px 13px;
+      background: rgba(11, 18, 34, 0.9);
       border: 1px solid rgba(255, 255, 255, 0.16);
-      border-radius: 9px;
+      border-radius: 10px;
       color: var(--txt);
       font-size: 13.5px;
       font-family: inherit;
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.35);
     }
 
     input:focus, select:focus {
       outline: none;
-      border-color: var(--party-color);
-      box-shadow: 0 0 0 3px var(--party-soft);
+      border-color: var(--gold-lt);
+      box-shadow: 0 0 0 3px rgba(229, 184, 66, 0.2);
     }
 
     .p-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
       gap: 10px;
-      max-height: 520px;
+      max-height: 530px;
       overflow-y: auto;
       padding-right: 6px;
     }
 
     .p-card {
-      background: var(--bg-2);
-      border: 2px solid var(--bd);
-      border-radius: 12px;
-      padding: 10px;
+      background: linear-gradient(145deg, rgba(19, 29, 51, 0.92), rgba(11, 18, 34, 0.92));
+      border: 1.5px solid rgba(255, 255, 255, 0.1);
+      border-radius: 13px;
+      padding: 11px;
       cursor: pointer;
       display: flex;
       align-items: center;
       gap: 10px;
-      transition: all 0.2s ease;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: var(--glass-highlight), 0 4px 12px rgba(0, 0, 0, 0.25);
     }
 
     .p-card:hover {
-      background: var(--bg-3);
+      background: linear-gradient(145deg, rgba(28, 42, 72, 0.95), rgba(16, 25, 46, 0.95));
+      border-color: rgba(253, 230, 138, 0.45);
       transform: translateY(-2px);
+      box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
     }
 
     .p-card.sel {
       border-color: var(--party-color);
-      background: linear-gradient(135deg, var(--party-soft), rgba(226, 185, 59, 0.12));
-      box-shadow: 0 6px 20px var(--party-soft);
+      background: linear-gradient(135deg, var(--party-soft), rgba(229, 184, 66, 0.16));
+      box-shadow: 0 0 0 1px var(--party-color), 0 8px 24px var(--party-soft);
     }
 
     .btn-gold {
-      background: linear-gradient(135deg, #fde047 0%, #ca8a04 100%);
-      color: #050811;
-      font-weight: 800;
-      border: none;
+      background: linear-gradient(135deg, #fde68a 0%, #eab308 50%, #ca8a04 100%);
+      color: #040710;
+      font-weight: 900;
+      letter-spacing: 0.3px;
+      border: 1px solid #fef08a;
       padding: 14px 20px;
-      border-radius: 11px;
+      border-radius: 12px;
       font-size: 15px;
       cursor: pointer;
       width: 100%;
       margin-top: 12px;
-      box-shadow: 0 8px 22px rgba(226, 185, 59, 0.3);
-      transition: transform 0.15s ease, filter 0.15s ease;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 10px 26px rgba(229, 184, 66, 0.35);
+      transition: transform 0.18s ease, filter 0.18s ease, box-shadow 0.18s ease;
     }
 
-    .btn-gold:hover { filter: brightness(1.08); transform: translateY(-1px); }
+    .btn-gold:hover {
+      filter: brightness(1.07);
+      transform: translateY(-2px);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 14px 32px rgba(229, 184, 66, 0.48);
+    }
 
     /* TOPBAR PRINCIPALE */
     #appView { display: none; padding-top: 5px; }
 
     .topbar {
-      background: linear-gradient(90deg, rgba(8, 13, 24, 0.97) 0%, rgba(var(--party-rgb), 0.20) 50%, rgba(8, 13, 24, 0.97) 100%);
+      background: linear-gradient(90deg, rgba(6, 10, 20, 0.96) 0%, rgba(var(--party-rgb), 0.22) 50%, rgba(6, 10, 20, 0.96) 100%);
       border-bottom: 1px solid var(--party-border);
-      padding: 9px 18px;
+      padding: 10px 20px;
       display: flex;
       flex-wrap: wrap;
       align-items: center;
@@ -261,8 +322,9 @@
       position: sticky;
       top: 5px;
       z-index: 2000;
-      backdrop-filter: blur(16px);
-      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+      backdrop-filter: blur(20px) saturate(160%);
+      -webkit-backdrop-filter: blur(20px) saturate(160%);
+      box-shadow: 0 10px 32px rgba(0, 0, 0, 0.65);
     }
 
     .id-badge {
@@ -270,34 +332,48 @@
       align-items: center;
       gap: 12px;
       min-width: 0;
+      background: rgba(15, 23, 42, 0.65);
+      padding: 5px 12px 5px 8px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
     }
 
     #topLogo {
       width: 44px !important;
       height: 44px !important;
       flex-shrink: 0;
-      filter: drop-shadow(0 0 8px var(--party-glow));
+      filter: drop-shadow(0 0 10px var(--party-glow));
+      transition: transform 0.2s ease;
     }
+    #topLogo:hover { transform: scale(1.07); }
 
-    #topLeader { font-size: 15px !important; }
-    #topSub { font-size: 12px !important; color: var(--muted) !important; }
+    #topLeader {
+      font-size: 15px !important;
+      font-weight: 800;
+      color: #fff;
+      border-bottom: 1px dashed rgba(253, 230, 138, 0.5);
+      transition: color 0.15s ease;
+    }
+    #topLeader:hover { color: var(--gold-lt); }
+    #topSub { font-size: 11.5px !important; color: #94a3b8 !important; }
 
     .pill-role {
       font-size: 10.5px;
-      padding: 3px 9px;
+      padding: 3px 10px;
       border-radius: 99px;
       font-weight: 800;
       text-transform: uppercase;
       white-space: nowrap;
+      letter-spacing: 0.4px;
     }
 
-    .r-pm { background: rgba(226, 185, 59, 0.25); color: var(--gold-lt); border: 1px solid var(--gold); }
+    .r-pm { background: linear-gradient(135deg, rgba(229, 184, 66, 0.32), rgba(202, 138, 4, 0.2)); color: var(--gold-lt); border: 1px solid var(--gold); box-shadow: 0 0 12px rgba(229, 184, 66, 0.25); }
     .r-gov { background: rgba(16, 185, 129, 0.22); color: #34d399; border: 1px solid var(--ok); }
     .r-opp { background: rgba(239, 68, 68, 0.22); color: #f87171; border: 1px solid var(--err); }
     .r-ind { background: #ffffff; color: #0f172a; border: 1px solid #cbd5e1; font-weight: 900; }
     .r-dict { background: linear-gradient(135deg, #991b1b, #450a0a); color: #fde047; border: 1px solid #ef4444; }
 
-    /* KPI INTERATTIVI CON DESCRIZIONE AL CLICK (PUNTO 18) */
+    /* KPI INTERATTIVI STILE TELEMETRIA MODERNA (PUNTO 9 & 18) */
     .kpi-strip {
       display: flex;
       gap: 7px;
@@ -306,31 +382,33 @@
     }
 
     .kpi {
-      background: rgba(19, 29, 49, 0.92);
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      border-bottom: 2px solid var(--party-color);
-      padding: 5px 10px;
-      border-radius: 9px;
-      min-width: 84px;
+      background: linear-gradient(180deg, rgba(21, 32, 56, 0.92) 0%, rgba(11, 18, 33, 0.95) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-top: 1px solid rgba(255, 255, 255, 0.2);
+      border-bottom: 2.5px solid var(--party-color);
+      padding: 6px 11px;
+      border-radius: 11px;
+      min-width: 86px;
       flex-shrink: 0;
       cursor: pointer;
-      transition: all 0.15s ease;
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
       position: relative;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     }
 
     .kpi:hover {
-      background: var(--bg-3);
+      background: linear-gradient(180deg, rgba(30, 45, 78, 0.96) 0%, rgba(17, 26, 48, 0.98) 100%);
       transform: translateY(-2px);
       border-color: var(--gold-lt);
-      box-shadow: 0 4px 12px rgba(226, 185, 59, 0.22);
+      box-shadow: 0 8px 20px rgba(229, 184, 66, 0.22);
     }
 
     .kpi-l {
       font-size: 9.5px;
       text-transform: uppercase;
-      color: var(--muted);
-      font-weight: 700;
-      letter-spacing: 0.03em;
+      color: #94a3b8;
+      font-weight: 800;
+      letter-spacing: 0.04em;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -340,32 +418,34 @@
     .kpi-l .info-dot {
       color: var(--gold-lt);
       font-size: 10px;
-      opacity: 0.8;
+      opacity: 0.85;
     }
 
     .kpi-v {
+      font-family: 'JetBrains Mono', 'Plus Jakarta Sans', sans-serif;
       font-size: 13.5px;
       font-weight: 800;
-      margin-top: 1px;
+      margin-top: 2px;
+      letter-spacing: -0.2px;
     }
 
-    /* NUOVA BARRA DEDICATA E FISSA PER L'AVANZAMENTO DEL TEMPO (BUG FIX 1) */
+    /* BARRA DEDICATA E FISSA PER L'AVANZAMENTO DEL TEMPO */
     .time-command-bar {
-      background: linear-gradient(90deg, rgba(11, 18, 32, 0.98) 0%, rgba(28, 42, 70, 0.95) 50%, rgba(11, 18, 32, 0.98) 100%);
-      border-bottom: 2px solid var(--gold-bd);
-      padding: 8px 18px;
+      background: linear-gradient(90deg, rgba(8, 13, 25, 0.98) 0%, rgba(22, 34, 60, 0.96) 50%, rgba(8, 13, 25, 0.98) 100%);
+      border-bottom: 1.5px solid var(--gold-bd);
+      padding: 8px 20px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       flex-wrap: wrap;
       gap: 12px;
-      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+      box-shadow: 0 6px 22px rgba(0, 0, 0, 0.5);
     }
 
     .time-display-group {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
       flex-wrap: wrap;
     }
 
@@ -373,16 +453,16 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      background: rgba(5, 8, 17, 0.85);
+      background: rgba(4, 7, 16, 0.9);
       border: 1px solid var(--gold);
-      padding: 6px 14px;
+      padding: 5px 14px;
       border-radius: 10px;
-      box-shadow: inset 0 0 12px rgba(226, 185, 59, 0.15);
+      box-shadow: inset 0 0 14px rgba(229, 184, 66, 0.16);
     }
 
     .date-txt {
       font-family: 'Plus Jakarta Sans', sans-serif;
-      font-size: 15px;
+      font-size: 14.5px;
       font-weight: 800;
       color: var(--gold-lt);
       letter-spacing: 0.3px;
@@ -392,10 +472,10 @@
     .turn-counter-pill {
       font-size: 11.5px;
       color: var(--muted);
-      background: var(--bg-2);
-      padding: 3px 9px;
-      border-radius: 6px;
-      border: 1px solid var(--bd);
+      background: rgba(17, 26, 48, 0.85);
+      padding: 4px 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
       font-weight: 700;
     }
 
@@ -411,53 +491,56 @@
       font-weight: 800;
       text-transform: uppercase;
       color: var(--gold-lt);
-      letter-spacing: 0.5px;
+      letter-spacing: 0.6px;
       margin-right: 4px;
     }
 
     .btn-time {
-      padding: 8px 14px;
-      border-radius: 9px;
+      padding: 7px 14px;
+      border-radius: 10px;
       font-weight: 800;
-      font-size: 13px;
+      font-size: 12.5px;
       cursor: pointer;
-      border: 1px solid rgba(255,255,255,0.2);
+      border: 1px solid rgba(255,255,255,0.22);
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      transition: all 0.15s ease;
+      transition: all 0.16s ease;
       white-space: nowrap;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 4px 10px rgba(0,0,0,0.3);
     }
     .btn-time:hover {
-      transform: translateY(-1px);
+      transform: translateY(-1.5px);
       filter: brightness(1.12);
     }
     .btn-t1 { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff; }
-    .btn-t7 { background: linear-gradient(135deg, #fde047, #ca8a04); color: #050811; border-color: #fde047; }
+    .btn-t7 { background: linear-gradient(135deg, #fde68a, #ca8a04); color: #050811; border-color: #fde68a; }
     .btn-t30 { background: linear-gradient(135deg, #10b981, #059669); color: #fff; border-color: #34d399; }
 
     .btn {
-      background: linear-gradient(135deg, var(--party-color), #1d4ed8);
+      background: linear-gradient(135deg, var(--party-color), #1e40af);
       color: #fff;
-      border: 1px solid rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.18);
       padding: 8px 13px;
-      border-radius: 8px;
+      border-radius: 9px;
       font-weight: 700;
       font-size: 12.5px;
       cursor: pointer;
-      transition: all 0.15s ease;
+      transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
       line-height: 1.3;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 3px 8px rgba(0, 0, 0, 0.28);
     }
 
     .btn:hover:not(:disabled) {
-      filter: brightness(1.15);
-      transform: translateY(-1px);
+      filter: brightness(1.14);
+      transform: translateY(-1.5px);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 6px 14px rgba(0, 0, 0, 0.38);
     }
 
     .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-    .btn-w { background: linear-gradient(135deg, #fde047, #ca8a04) !important; color: #050811 !important; border: none; }
-    .btn-m { background: linear-gradient(135deg, #10b981, #059669) !important; color: #fff !important; }
-    .btn-r { background: linear-gradient(135deg, #ef4444, #b91c1c) !important; color: #fff !important; }
+    .btn-w { background: linear-gradient(135deg, #fde68a, #ca8a04) !important; color: #050811 !important; border: 1px solid #fef08a !important; font-weight: 800; }
+    .btn-m { background: linear-gradient(135deg, #10b981, #059669) !important; color: #fff !important; border-color: #34d399 !important; }
+    .btn-r { background: linear-gradient(135deg, #ef4444, #b91c1c) !important; color: #fff !important; border-color: #f87171 !important; }
 
     #campRibbon {
       display: none;
@@ -483,9 +566,9 @@
     }
 
     .ticker {
-      background: rgba(11, 18, 32, 0.95);
-      border-bottom: 1px solid var(--bd);
-      padding: 7px 18px;
+      background: rgba(8, 13, 25, 0.96);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 7px 20px;
       display: flex;
       align-items: center;
       gap: 10px;
@@ -493,22 +576,24 @@
     }
 
     .t-tag {
-      background: var(--it-r);
+      background: linear-gradient(135deg, #ef4444, #b91c1c);
       color: #fff;
       font-weight: 800;
       font-size: 10px;
-      padding: 3px 8px;
-      border-radius: 5px;
+      padding: 3px 9px;
+      border-radius: 6px;
       flex-shrink: 0;
+      letter-spacing: 0.6px;
+      box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
     }
 
     /* ARCHITETTURA DESKTOP SPAZIOSA */
     .war-room {
-      max-width: 1720px;
+      max-width: 1740px;
       margin: 14px auto;
-      padding: 0 16px 40px;
+      padding: 0 16px 44px;
       display: grid;
-      grid-template-columns: 320px minmax(0, 1fr) 320px;
+      grid-template-columns: 325px minmax(0, 1fr) 325px;
       grid-template-rows: auto 1fr;
       gap: 16px;
       align-items: start;
@@ -518,20 +603,21 @@
       grid-column: 1 / -1;
       display: grid;
       grid-template-columns: repeat(5, 1fr);
-      gap: 7px;
-      background: rgba(11, 18, 32, 0.90);
-      border: 1px solid var(--party-border);
-      padding: 8px;
-      border-radius: 14px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      gap: 8px;
+      background: linear-gradient(180deg, rgba(14, 22, 40, 0.94) 0%, rgba(8, 13, 25, 0.96) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-top: 2px solid var(--gold-bd);
+      padding: 9px;
+      border-radius: 16px;
+      box-shadow: var(--glass-highlight), 0 12px 32px rgba(0, 0, 0, 0.5);
     }
 
     .nav-item {
-      background: var(--bg-2);
-      border: 1px solid var(--bd);
-      color: var(--muted);
-      padding: 10px 10px;
-      border-radius: 10px;
+      background: rgba(19, 29, 51, 0.78);
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      color: #cbd5e1;
+      padding: 10px 12px;
+      border-radius: 11px;
       font-weight: 700;
       font-size: 12.5px;
       cursor: pointer;
@@ -539,40 +625,47 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 6px;
-      transition: all 0.2s ease;
+      gap: 7px;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     .nav-item:hover {
-      background: var(--bg-3);
-      color: var(--txt);
-      transform: translateY(-1px);
+      background: rgba(30, 45, 76, 0.92);
+      color: #ffffff;
+      border-color: rgba(253, 230, 138, 0.35);
+      transform: translateY(-1.5px);
     }
 
     .nav-item.active {
-      background: linear-gradient(135deg, rgba(var(--party-rgb), 0.45), rgba(226, 185, 59, 0.25));
+      background: linear-gradient(135deg, rgba(var(--party-rgb), 0.52), rgba(229, 184, 66, 0.28));
       color: #ffffff;
-      border-color: var(--party-color);
-      box-shadow: 0 4px 16px var(--party-glow);
+      font-weight: 800;
+      border-color: var(--gold-lt);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 6px 18px var(--party-glow);
     }
 
     /* SONDAGGI E CARTE */
     .poll-r {
       margin-bottom: 6px;
-      padding: 5px 7px;
-      border-radius: 8px;
+      padding: 6px 8px;
+      border-radius: 10px;
+      border: 1px solid transparent;
       cursor: pointer;
-      transition: background 0.15s ease;
+      transition: all 0.16s ease;
     }
 
-    .poll-r:hover { background: rgba(255, 255, 255, 0.06); }
+    .poll-r:hover {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.12);
+      transform: translateX(2px);
+    }
 
     .poll-h {
       display: flex;
       justify-content: space-between;
       align-items: center;
       font-size: 12.5px;
-      margin-bottom: 3px;
+      margin-bottom: 4px;
       gap: 6px;
     }
 
@@ -596,25 +689,27 @@
       background: rgba(255, 255, 255, 0.09);
       border-radius: 99px;
       overflow: hidden;
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45);
     }
 
     .p-fill, .bar-f, .pfill {
       height: 100%;
       border-radius: 99px;
-      transition: width 0.3s ease;
+      transition: width 0.35s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
     .grid3 { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
 
     .box, .manifesto-box {
-      background: rgba(19, 29, 49, 0.88);
+      background: linear-gradient(165deg, rgba(19, 29, 51, 0.86) 0%, rgba(11, 18, 34, 0.92) 100%);
       border: 1px solid rgba(255, 255, 255, 0.11);
-      border-radius: 12px;
+      border-radius: 14px;
       padding: 14px;
       margin-bottom: 10px;
       min-width: 0;
       overflow-wrap: break-word;
+      box-shadow: var(--glass-highlight), 0 6px 18px rgba(0, 0, 0, 0.26);
     }
 
     .box h4 {
@@ -630,7 +725,7 @@
       line-height: 1.48;
     }
 
-    /* NUOVA GRIGLIA PROGRAMMA A 5 POSIZIONI CON ORIENTAMENTO POLITICO ESPLICITO (PUNTO 16) */
+    /* GRIGLIA PROGRAMMA A 5 POSIZIONI CON ORIENTAMENTO POLITICO ESPLICITO */
     .st-spectrum-bar {
       display: flex;
       justify-content: space-between;
@@ -639,9 +734,9 @@
       font-weight: 800;
       padding: 4px 10px;
       margin: 7px 0 6px;
-      border-radius: 6px;
+      border-radius: 7px;
       background: linear-gradient(90deg, rgba(220,38,38,0.28) 0%, rgba(16,185,129,0.22) 25%, rgba(6,182,212,0.20) 50%, rgba(37,99,235,0.25) 75%, rgba(99,102,241,0.30) 100%);
-      border: 1px solid rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.12);
     }
 
     .st-grid {
@@ -656,12 +751,12 @@
       border: 1px solid var(--bd);
       color: var(--muted);
       padding: 9px 10px;
-      border-radius: 9px;
+      border-radius: 10px;
       font-size: 12px;
       cursor: pointer;
       text-align: left;
       line-height: 1.35;
-      transition: all 0.15s ease;
+      transition: all 0.16s ease;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
@@ -671,7 +766,7 @@
     .st-opt:hover { background: rgba(255, 255, 255, 0.09); color: #fff; transform: translateY(-1px); }
 
     .st-opt.active {
-      background: linear-gradient(135deg, rgba(var(--party-rgb), 0.42), rgba(59, 130, 246, 0.28));
+      background: linear-gradient(135deg, rgba(var(--party-rgb), 0.45), rgba(59, 130, 246, 0.28));
       border: 2px solid var(--gold-lt);
       color: #fff;
       font-weight: 700;
@@ -710,7 +805,7 @@
     }
 
     .feed {
-      max-height: 500px;
+      max-height: 520px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
@@ -719,10 +814,11 @@
     }
 
     .f-item {
-      background: var(--bg-2);
+      background: linear-gradient(145deg, rgba(19, 29, 51, 0.92), rgba(11, 18, 34, 0.92));
+      border: 1px solid rgba(255, 255, 255, 0.07);
       border-left: 4px solid var(--party-color);
       padding: 9px 11px;
-      border-radius: 8px;
+      border-radius: 9px;
       font-size: 12.5px;
       line-height: 1.45;
       overflow-wrap: break-word;
@@ -730,14 +826,15 @@
 
     .f-item.ai { border-left-color: #38bdf8; }
     .f-item.cr { border-left-color: var(--err); }
-    .f-dt { font-size: 10.5px; color: var(--muted); font-weight: 700; margin-bottom: 3px; }
+    .f-dt, .f-date { font-size: 10.5px; color: var(--gold-lt); font-weight: 800; margin-bottom: 3px; }
 
     /* MODAL */
     .modal-bg {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.85);
-      backdrop-filter: blur(8px);
+      background: rgba(2, 5, 12, 0.86);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
       display: none;
       align-items: center;
       justify-content: center;
@@ -748,15 +845,16 @@
     .modal-bg.open { display: flex; }
 
     .modal-w {
-      background: var(--bg-1);
-      border: 2px solid var(--party-color);
-      border-radius: 16px;
+      background: linear-gradient(165deg, #0d1528 0%, #070c18 100%);
+      border: 1.5px solid var(--party-color);
+      border-top: 3px solid var(--gold-lt);
+      border-radius: 18px;
       max-width: 900px;
       width: 100%;
       padding: 22px;
       max-height: 92vh;
       overflow-y: auto;
-      box-shadow: 0 25px 70px rgba(0, 0, 0, 0.9), 0 0 35px var(--party-soft);
+      box-shadow: var(--glass-highlight), 0 28px 80px rgba(0, 0, 0, 0.92), 0 0 40px var(--party-soft);
     }
 
     .m-tag {
@@ -770,23 +868,29 @@
       border-radius: 99px;
       text-transform: uppercase;
       margin-bottom: 8px;
+      letter-spacing: 0.5px;
     }
 
     .m-list { display: flex; flex-direction: column; gap: 9px; margin-top: 14px; }
 
     .m-btn {
-      background: var(--bg-2);
-      border: 1px solid var(--bd);
+      background: linear-gradient(145deg, rgba(19, 29, 51, 0.95), rgba(13, 21, 38, 0.95));
+      border: 1px solid rgba(255, 255, 255, 0.14);
       color: var(--txt);
-      padding: 12px 14px;
-      border-radius: 10px;
+      padding: 12px 15px;
+      border-radius: 11px;
       text-align: left;
       cursor: pointer;
       font-size: 13px;
       line-height: 1.45;
+      transition: all 0.16s ease;
     }
 
-    .m-btn:hover { border-color: var(--party-color); background: var(--bg-3); }
+    .m-btn:hover {
+      border-color: var(--gold-lt);
+      background: rgba(28, 42, 72, 0.95);
+      transform: translateX(3px);
+    }
     .m-btn strong { display: block; color: var(--gold-lt); font-size: 14px; margin-bottom: 4px; }
 
     /* PUNTO 13: SELETTORE CUSTOM INTEGRATO NEL MOTORE DI GIOCO (SOSTITUISCE IL MENU NATIVO MACOS) */
@@ -1051,28 +1155,33 @@
 <body>
   <div class="tricolor"></div>
 
-  <!-- SCHERMATA MENU PRINCIPALE (PUNTI 12, 13, 14) -->
+  <!-- SCHERMATA MENU PRINCIPALE -->
   <section id="setupView">
     <div class="hero-box">
-      <h1>MONTECITORIO (v6.4)</h1>
-      <p class="hero-sub">Simulatore Politico</p>
+      <div class="hero-badge">🇮🇹 REPUBBLICA ITALIANA • EDIZIONE UFFICIALE 1.7</div>
+      <h1>MONTECITORIO 1.7</h1>
+      <p class="hero-sub">Simulatore Politico & Istituzionale</p>
     </div>
 
-    <!-- SEZIONE NOVITÀ DELL'AGGIORNAMENTO (v6.2.1) + GUIDA NUOVI GIOCATORI -->
+    <!-- SEZIONE NOVITÀ DELL'AGGIORNAMENTO (1.7) + GUIDA NUOVI GIOCATORI (PUNTO 10: FORMATO CONCISO) -->
     <div class="setup-info-bar">
       <div class="glass" style="border-top-color:var(--gold);">
         <div class="sec-hdr">
-          <span>🔥 Novità dell'Aggiornamento (v6.4)</span>
-          <span style="font-size:11px; color:var(--ok); font-weight:800;">Consiglio dei Ministri Reale, 180 Politici, Eventi Contestuali & UI Restyling</span>
+          <span>🔥 Novità della Versione 1.7</span>
+          <span style="font-size:11px; color:var(--ok); font-weight:800;">Nuove Funzionalità & Changelog</span>
         </div>
-        <div style="font-size:12.5px; color:var(--muted); line-height:1.5; max-height:210px; overflow-y:auto; padding-right:6px;">
-          • <strong>Consiglio dei Ministri & Risoluzione Cumulo Cariche</strong>: risolta l'assegnazione anomala di ministeri al Premier. Giorgia Meloni inizia la partita esclusivamente come Presidente del Consiglio (0 ministeri a carico) con un CdM reale di 15 ministri dedicati (MEF a Giorgetti, Esteri a Tajani, Interni a Piantedosi, Difesa a Crosetto, Giustizia a Nordio, MIMIT a Urso, Lavoro a Calderone, Salute a Schillaci, Cultura a Giuli, MIT a Salvini, MASE a Pichetto, MIM a Valditara, MUR a Bernini, Agricoltura a Lollobrigida, Turismo a Santanchè).<br>
-          • <strong>Roster Completo e Gerarchico di 180 Politici</strong>: esattamente 7 politici per tutti i 24 partiti italiani organizzati in una gerarchia istituzionale definita (Segretario, Vicesegretario, Capigruppo Camera e Senato, Capocorrente, Responsabile Territorio/Governatore) + 12 Tecnici e Riserve della Repubblica. Susanna Ceccardi correttamente integrata nella Lega.<br>
-          • <strong>Restyling Grafico & Pulizia Scheda Temi Caldi</strong>: nuova interfaccia glassmorphism con contrasti migliorati; eliminata ogni confusione o etichetta 'stato attuale' dalle proposte di legge, con netta distinzione tra <em>Normativa Vigente in Italia</em> e <em>Riforme Legislative o Referendum Proposti</em>.<br>
-          • <strong>Eventi Narrativi Contestuali al 100%</strong>: 49 eventi storici e geopolitici rigorosamente filtrati in base al ruolo del giocatore (Presidente del Consiglio, Ministro di Dicastero, Capo dello Stato, Opposizione Parlamentare, Dirigente di Partito, Cittadino Indipendente, Esilio). Gli indipendenti affrontano dibattiti civili, conferenze a Davos, pubblicazioni editoriali e lectio magistralis senza mai ricevere decreti di governo.<br>
-          • <strong>Elezioni del Quirinale & Tutela Costituzionale</strong>: successione immediata alla Presidenza del Consiglio se il Premier sale al Colle, aggiornamento del profilo a Capo dello Stato super partes, divieto di cumulo con la presidenza del Senato (mai assegnata al Premier). Agli indipendenti senza seggi è precluso il voto parlamentare (Art. 83 Cost.), con facoltà di assistere allo scrutinio o lanciare appelli morali.<br>
-          • <strong>Nomi Secessionisti Realistici</strong>: pool di denominazioni autentiche per le scissioni (Riscossa Patriottica, Sovranità Popolare, Forza Liberale, Socialdemocrazia, Patto del Nord, Polo Riformista, ecc.).<br>
-          • <strong>Curriculum Dinamico & Formazione Nuovi Poli</strong>: ogni politico aggiorna in tempo reale il proprio curriculum storico con le cariche assunte in partita. Solo il partito capofila può rinominare la coalizione, mentre i partiti non allineati possono federarsi e fondare nuovi poli d'area.
+        <div style="font-size:12.5px; color:var(--muted); line-height:1.5; max-height:215px; overflow-y:auto; padding-right:6px;">
+          <div style="color:var(--gold-lt); font-weight:800; font-size:11.5px; text-transform:uppercase; letter-spacing:0.6px; margin-bottom:4px;">✨ Nuove Funzionalità Introdotte</div>
+          • <strong>267 Politici Reali & 62 Protagonisti Giocabili</strong>: ampliato il database parlamentare per tutti i 24 partiti (inclusi <em>Silvia Sardone</em>, <em>Matteo Hallissey</em>, governatori, ministri e capigruppo).<br>
+          • <strong>Governo IA Dinamico e Attivo</strong>: quando giochi all'opposizione o fuori dall'esecutivo, il Governo IA emana decreti, propone riforme sui 16 Temi Caldi, indice referendum e vara manovre di bilancio.<br>
+          • <strong>Riforme dell'Ordinamento dello Stato Reali</strong>: passare a <em>Presidenzialismo</em>, <em>Premierato</em>, <em>Cancellierato</em> o <em>Repubblica Federale</em> trasforma realmente cariche, crisi di governo, sfiducia costruttiva ed elezioni.<br>
+          • <strong>Eventi Speciali & Opposizione Costruttiva</strong>: nuovi eventi dedicati a campagne elettorali, referendum, Quirinale e crisi, con scelte sia di opposizione dura che costruttiva/bipartisan.<br>
+          • <strong>Restyling Dashboard & Nomi Cliccabili Ovunque</strong>: nuova interfaccia glassmorphic ad alto contrasto; ogni nome di politico in qualsiasi menu apre la sua scheda biografica e Bussola 2D.<br>
+          <div style="color:#38bdf8; font-weight:800; font-size:11px; text-transform:uppercase; letter-spacing:0.6px; margin:8px 0 3px; padding-top:6px; border-top:1px solid rgba(255,255,255,0.1);">🛠️ Bug Fix Principali (1.7)</div>
+          • Aggiornamento in tempo reale del curriculum nelle schede politici e dicitura <em>Presidente della Repubblica</em> unificata.<br>
+          • Consultazioni obbligatorie al Quirinale prima dello scioglimento delle Camere (Art. 88 Cost.) e banner esplicito dei partiti al Governo.<br>
+          • Indicazione del partito dei candidati al Quirinale, coalizione attuale nelle schede partito e nome dinamico per <em>Lega per [Segretario] Premier</em>.<br>
+          • Trasferimento reale di parlamentari nei partiti nati da scissioni, ponderazione ISTAT regionale/nazionale e scale sondaggi dinamiche.
         </div>
       </div>
 
@@ -1081,12 +1190,12 @@
           <span>📖 Guida Rapida per i Nuovi Giocatori</span>
           <button class="btn btn-m" style="padding:4px 10px; font-size:11px;" onclick="openTutorialModal()">📚 Apri Manuale Completo</button>
         </div>
-        <div style="font-size:12.5px; color:var(--muted); line-height:1.5; max-height:210px; overflow-y:auto; padding-right:6px;">
+        <div style="font-size:12.5px; color:var(--muted); line-height:1.5; max-height:215px; overflow-y:auto; padding-right:6px;">
           1. <strong>Come Scorre il Tempo</strong>: usa la barra <em>Cronometro della Repubblica</em> in alto (`+1 Giorno`, `+7 Giorni`, `+30 Giorni`). Ogni settimana incassi fondi, rigeneri <strong>Capitale Politico (⚡)</strong> e si aggiornano i sondaggi.<br>
           2. <strong>Indicatori Interattivi (KPI)</strong>: clicca su qualsiasi riquadro in alto (<em>Consenso, Forza Corrente, Prestigio, Spread, Stabilità</em>) per leggere una spiegazione dettagliata di cosa significa e come migliorarlo!<br>
           3. <strong>Programma e 12 Bacini Sociali</strong>: ogni Dossier ha 5 posizioni chiaramente marcate da <em>🚩 Estrema Sinistra</em> a <em>🦅 Estrema Destra</em>. Allineati ai bacini elettorali, ma attenzione a non tradire bruscamente lo Statuto del tuo partito!<br>
-          4. <strong>Carriera, Congressi e Indipendenti</strong>: se sei Capocorrente, rafforza la tua corrente per sfidare il Segretario al Congresso. Se sei Indipendente (tema bianco), accresci il tuo prestigio per diventare Premier Tecnico, Capo dello Stato o fondare un partito.<br>
-          5. <strong>Governo, Leggi e Politica Estera</strong>: vinci le elezioni per nominare manualmente i 12 Ministri e i Presidenti di Camera e Senato, approvare DDL, lanciare Referendum Popolari e guidare la diplomazia internazionale.
+          4. <strong>Carriera, Congressi e Indipendenti</strong>: se sei Capocorrente, rafforza la tua corrente per sfidare il Segretario al Congresso. Se sei Indipendente (tema bianco), accresci il tuo prestigio per diventare Premier Tecnico, Presidente della Repubblica o fondare un partito.<br>
+          5. <strong>Governo, Leggi e Politica Estera</strong>: vinci le elezioni per nominare manualmente i 15 Ministri e i Presidenti di Camera e Senato, approvare DDL, lanciare Referendum Popolari e guidare la diplomazia internazionale.
         </div>
       </div>
     </div>
@@ -1096,7 +1205,7 @@
         <div class="sec-hdr">
           <span>1. Scelta Personaggio</span>
           <div style="display:flex; gap:5px;">
-            <button class="btn" id="btnCharReal" onclick="setCharMode('preset')">Politico Reale (48)</button>
+            <button class="btn" id="btnCharReal" onclick="setCharMode('preset')">Politico Reale (62)</button>
             <button class="btn" id="btnCharCust" style="background:var(--bg-2);" onclick="setCharMode('custom')">Crea Personaggio</button>
           </div>
         </div>
