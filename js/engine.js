@@ -22,7 +22,14 @@ import {
   DISTINCT_PALETTE,
   SPLIT_POOLS,
   REGIONAL_PROFILES,
-  getPartySVG
+  INITIAL_GOVERNORS,
+  getPartySVG,
+  LOGO_COLORS,
+  LOGO_RINGS,
+  LOGO_BANNERS,
+  LOGO_SYMBOLS,
+  renderCustomPartyLogoSVG,
+  readablePartyColor
 } from './data.js';
 
 import {
@@ -42,7 +49,9 @@ import {
   adjAllySat,
   ensurePlayerInPoliticians,
   getPlayerMinistry,
+  getPlayerGovernorship,
   getPersonCurrentOffice,
+  enforceSingleOfficeRule,
   vacateOfficesForPresident,
   isSemestreBianco,
   getPoliticiansForParty,
@@ -57,7 +66,10 @@ import {
   recalcDynamicVetoes,
   fmtDate,
   recordPoliticianHistory,
-  syncPartyNameWithLeader
+  syncPartyNameWithLeader,
+  syncAllPoliticianCareersWithCurrentState,
+  resignPlayerOffice,
+  getPlayerOfficesList
 } from './state.js';
 
 // Safe UI bridge delegators
@@ -66,6 +78,372 @@ const setTicker = (msg) => (typeof window !== 'undefined' && window.setTicker ? 
 const openModal = (...args) => (typeof window !== 'undefined' && window.openModal ? window.openModal(...args) : null);
 const closeModal = () => (typeof window !== 'undefined' && window.closeModal ? window.closeModal() : null);
 const updateAllUI = () => (typeof window !== 'undefined' && window.updateAllUI ? window.updateAllUI() : null);
+
+// PUNTO 30 (1.8): Assegna un roster completo di almeno 18 politici per ogni nuovo partito fondato o nato da scissione
+export function populateNewPartyPoliticians(partyId, targetCount = 18) {
+  const existing = POLITICIANS.filter(p => p.partyId === partyId);
+  const needed = Math.max(0, targetCount - existing.length);
+  for (let k = 0; k < needed; k++) {
+    generateNewPolitician(partyId);
+  }
+}
+
+// PUNTI 3, 15, 16 (1.8.1): Ritiro volontario (Modalità Spettatore) con azzeramento cariche e divieto di assunzione ruoli
+export function togglePoliticalRetirement(retire = null) {
+  if (retire === null) {
+    game.isRetired = !game.isRetired;
+  } else {
+    game.isRetired = !!retire;
+  }
+  if (game.isRetired) {
+    // Vacate all offices immediately
+    resignPlayerOffice('all');
+    addFeed(`🌅 <strong>RITIRO DALLA VITA POLITICA ATTIVA:</strong> <strong>${game.leader.name}</strong> annuncia il ritiro dall'agone politico. Attivata la <strong>Modalità Spettatore</strong>: tutti gli incarichi sono stati rimessi, non puoi assumere ministeri o presidenza e le azioni sono sospese fino a un eventuale ritorno!`, 'ok');
+    setTicker(`MODALITÀ SPETTATORE: ${game.leader.name} si ritira dalla vita politica attiva.`);
+  } else {
+    addFeed(`🔥 <strong>RIENTRO NELL'ARENA POLITICA:</strong> <strong>${game.leader.name}</strong> torna in campo e riprende la piena attività politica!`, 'ok');
+    setTicker(`RIENTRO IN CAMPO: ${game.leader.name} torna alla vita politica attiva!`);
+  }
+  enforceSingleOfficeRule();
+  updateAllUI();
+}
+
+// PUNTO 33 (1.8): Morte naturale a 80+ anni con resoconto storico della carriera (Fine Partita)
+export function triggerPlayerNaturalDeathModal() {
+  game.isDead = true;
+  const leaderPol = POLITICIANS.find(x => x.isPlayer || x.name === game.leader.name);
+  recordPoliticianHistory(game.leader.name, `Scomparsa all'età di ${game.leader.age} anni dopo una lunga carriera istituzionale`, 'Deceduto');
+
+  // PUNTO 18 (1.8.1): Recupero completo del CV e della carriera storica reale
+  const historyList = [];
+  if (Array.isArray(game.leader?.history)) {
+    game.leader.history.forEach(h => {
+      const s = typeof h === 'string' ? h : h.title;
+      if (s && !historyList.includes(s)) historyList.push(s);
+    });
+  }
+  if (Array.isArray(leaderPol?.history)) {
+    leaderPol.history.forEach(h => {
+      const s = typeof h === 'string' ? h : h.title;
+      if (s && !historyList.includes(s)) historyList.push(s);
+    });
+  }
+  if (game.leader.name === 'Sergio Mattarella' || leaderPol?.id === 'mattarella' || leaderPol?.id === 'p_mattarella') {
+    const mattarellaRoles = [
+      "Presidente della Repubblica Italiana (2015–" + game.date.getFullYear() + ")",
+      "Giudice della Corte Costituzionale della Repubblica (2011–2015)",
+      "Ministro della Difesa (1999–2001)",
+      "Vicepresidente del Consiglio dei Ministri (1998–1999)",
+      "Ministro della Pubblica Istruzione (1989–1990)",
+      "Ministro per i Rapporti con il Parlamento (1987–1989)",
+      "Deputato della Repubblica Italiana (1983–2008)"
+    ];
+    mattarellaRoles.forEach(r => {
+      if (!historyList.some(existing => existing.includes(r.split(' (')[0]))) {
+        historyList.push(r);
+      }
+    });
+  }
+  if (historyList.length === 0) {
+    historyList.push(`Figura di rilievo della Repubblica Italiana (${game.date.getFullYear() - game.leader.age}–${game.date.getFullYear()})`);
+  }
+
+  addFeed(`🖤 <strong>ESEQUIE DI STATO PER ${game.leader.name.toUpperCase()}:</strong> Bandiere a mezz'asta su tutti gli edifici pubblici, campane a martello a Montecitorio e proclamazione del lutto nazionale di 3 giorni!`, 'cr');
+  setTicker(`LUTTO NAZIONALE: Scomparso all'età di ${game.leader.age} anni ${game.leader.name}. Esequie di Stato solenni.`);
+
+  const summaryHtml = `
+    <div style="font-size:13px; line-height:1.6; color:var(--text);">
+      <div style="background:rgba(226,185,59,0.12); border:1px solid var(--gold-bd); border-radius:10px; padding:14px; margin-bottom:14px; text-align:center;">
+        <div style="font-size:22px; font-weight:900; color:var(--gold-lt); margin-bottom:4px;">🕊️ Esequie di Stato: ${game.leader.name}</div>
+        <div style="font-size:12px; color:var(--muted);">${game.date.getFullYear() - game.leader.age} – ${game.date.getFullYear()} (Età: ${game.leader.age} anni) • Prestigio Storico: <strong style="color:var(--gold);">${game.leader.prestige}%</strong></div>
+        <div style="margin-top:8px; font-size:12px; font-style:italic; color:var(--text-bright);">"Servitore rigoroso delle Istituzioni e testimone della Costituzione repubblicana."</div>
+      </div>
+      <div style="font-weight:800; color:var(--gold-lt); margin-bottom:8px;">📜 Resoconto Storico degli Incarichi Ricoperti nella Repubblica:</div>
+      <div style="max-height:240px; overflow-y:auto; background:var(--bg-2); border:1px solid var(--border); border-radius:8px; padding:12px; margin-bottom:14px; display:flex; flex-direction:column; gap:8px;">
+        ${historyList.map(item => `
+          <div style="display:flex; align-items:flex-start; gap:8px; border-bottom:1px solid rgba(255,255,255,0.06); padding-bottom:6px;">
+            <span style="color:var(--gold);">🏛️</span>
+            <div style="font-weight:700; color:var(--text);">${item}</div>
+          </div>
+        `).join('')}
+      </div>
+      <div style="background:rgba(255,255,255,0.03); border-radius:8px; padding:10px; font-size:12px; color:var(--muted); text-align:center;">
+        Il feretro riceve gli onori dei Corazzieri e del Picchetto interforze. Si conclude qui la tua parabola politica.
+      </div>
+    </div>
+  `;
+
+  openModal(
+    `🖤 Esequie di Stato di ${game.leader.name} — Conclusione della Partita`,
+    summaryHtml,
+    [
+      {
+        label: "🏛️ Torna al Menu Principale",
+        fn: () => {
+          if (typeof window !== 'undefined') window.location.reload();
+        }
+      }
+    ]
+  );
+  updateAllUI();
+}
+
+// PUNTO 17 (1.8): Creatore Interattivo di Logo Partitico (Logo Builder)
+export function updateCustomLogoPreview() {
+  const pName = document.getElementById('custPartName')?.value || 'Nuovo Movimento';
+  const pShort = (document.getElementById('custPartShort')?.value || 'NM').toUpperCase().slice(0, 5);
+  const bgColor = document.getElementById('custPartBg')?.value || '#2563eb';
+  const ringStyle = document.getElementById('custPartRing')?.value || 'tricolore';
+  const bannerStyle = document.getElementById('custPartBanner')?.value || 'onda_tricolore';
+  const symbolId = document.getElementById('custPartSymbol')?.value || 'fiamma';
+
+  game.customLogoDraft = { bgColor, ringStyle, bannerStyle, symbolId };
+  const prevBox = document.getElementById('custLogoPreviewBox');
+  if (prevBox) {
+    prevBox.innerHTML = renderCustomPartyLogoSVG(game.customLogoDraft, pShort, bgColor);
+  }
+}
+
+export function openCustomPartyCreationModal(mode = 'found', parentParty = null, customStances = null) {
+  const isSplit = (mode === 'split' && parentParty);
+  const defaultName = isSplit ? `Alternativa ${parentParty.short}` : "Movimento Civico Nazionale";
+  const defaultShort = isSplit ? `A${parentParty.short.slice(0, 3)}` : "MCN";
+  const defaultColor = isSplit ? (parentParty.color || '#2563eb') : '#2563eb';
+
+  game.customLogoDraft = {
+    bgColor: defaultColor,
+    ringStyle: 'tricolore',
+    bannerStyle: 'onda_tricolore',
+    symbolId: 'fiamma'
+  };
+
+  const modalTitle = isSplit ? `⚡ Guida una Scissione da ${parentParty.short} e Fonda un Nuovo Partito` : "🏛️ Fondazione Nuovo Partito Nazionale & Logo Builder";
+  const bodyHtml = `
+    <div style="font-size:13px; color:var(--text); line-height:1.5;">
+      ${isSplit 
+        ? `Definisci l'identità ufficiale, la sigla e il simbolo elettorale del tuo nuovo partito scissionista da <strong>${parentParty.name}</strong>:` 
+        : `Investi <strong>€ 80k</strong> e <strong>35 ⚡</strong> per registrare il partito, depositare il contrassegno elettorale al Viminale e avviare il radicamento sul territorio:`}
+      
+      <div style="display:grid; grid-template-columns:1fr 140px; gap:16px; margin:14px 0; align-items:center; background:var(--bg-2); border:1px solid var(--border); border-radius:10px; padding:12px;">
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <div>
+            <label style="font-size:11px; font-weight:800; color:var(--muted); text-transform:uppercase;">Nome Ufficiale del Partito:</label>
+            <input type="text" id="custPartName" value="${defaultName}" style="width:100%; padding:6px 8px; font-size:13px; font-weight:700;" oninput="updateCustomLogoPreview()">
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+            <div>
+              <label style="font-size:11px; font-weight:800; color:var(--muted); text-transform:uppercase;">Sigla (max 5 lett.):</label>
+              <input type="text" id="custPartShort" value="${defaultShort}" maxlength="5" style="width:100%; padding:6px 8px; font-size:13px; font-weight:800; text-transform:uppercase;" oninput="updateCustomLogoPreview()">
+            </div>
+            <div>
+              <label style="font-size:11px; font-weight:800; color:var(--muted); text-transform:uppercase;">Colore Sfondo:</label>
+              <select id="custPartBg" style="width:100%; padding:6px 8px; font-size:12px;" onchange="updateCustomLogoPreview()">
+                ${LOGO_COLORS.map(c => `<option value="${c.hex}" ${c.hex === defaultColor ? 'selected' : ''}>${c.name}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+            <div>
+              <label style="font-size:11px; font-weight:800; color:var(--muted); text-transform:uppercase;">Bordo / Ghirlanda:</label>
+              <select id="custPartRing" style="width:100%; padding:6px 8px; font-size:12px;" onchange="updateCustomLogoPreview()">
+                ${LOGO_RINGS.map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <label style="font-size:11px; font-weight:800; color:var(--muted); text-transform:uppercase;">Fascia / Motivo:</label>
+              <select id="custPartBanner" style="width:100%; padding:6px 8px; font-size:12px;" onchange="updateCustomLogoPreview()">
+                ${LOGO_BANNERS.map(b => `<option value="${b.id}">${b.name}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label style="font-size:11px; font-weight:800; color:var(--muted); text-transform:uppercase;">Simbolo Politico Centrale:</label>
+            <select id="custPartSymbol" style="width:100%; padding:6px 8px; font-size:12px;" onchange="updateCustomLogoPreview()">
+              ${LOGO_SYMBOLS.map(s => `<option value="${s.id}">${s.icon} ${s.name}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:11px; font-weight:800; color:var(--gold-lt); margin-bottom:6px;">Anteprima Logo:</div>
+          <div id="custLogoPreviewBox" style="display:inline-block; filter:drop-shadow(0 4px 10px rgba(0,0,0,0.5));">
+            ${renderCustomPartyLogoSVG(game.customLogoDraft, defaultShort, defaultColor)}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  openModal(
+    modalTitle,
+    bodyHtml,
+    [
+      {
+        label: isSplit ? "⚡ Conferma Scissione e Fonda il Partito" : "🏛️ Fonda Ufficialmente il Partito",
+        fn: () => {
+          const pName = document.getElementById('custPartName')?.value.trim() || defaultName;
+          const pShort = (document.getElementById('custPartShort')?.value.trim() || defaultShort).toUpperCase().slice(0, 5);
+          const bgColor = document.getElementById('custPartBg')?.value || defaultColor;
+          const ringStyle = document.getElementById('custPartRing')?.value || 'tricolore';
+          const bannerStyle = document.getElementById('custPartBanner')?.value || 'onda_tricolore';
+          const symbolId = document.getElementById('custPartSymbol')?.value || 'fiamma';
+          const finalLogoCfg = { bgColor, ringStyle, bannerStyle, symbolId };
+
+          closeModal();
+          if (isSplit) {
+            finishPartySplitWithCustomLogo(parentParty, pName, pShort, finalLogoCfg, customStances);
+          } else {
+            finishFoundPartyWithCustomLogo(pName, pShort, finalLogoCfg);
+          }
+        }
+      },
+      {
+        label: "Annulla",
+        fn: () => { closeModal(); }
+      }
+    ]
+  );
+}
+
+function finishFoundPartyWithCustomLogo(pName, pShort, logoCfg) {
+  game.funds -= 80;
+  game.ap -= 35;
+  const newId = 'founded_' + game.turn;
+  const rising = generateNewPolitician(newId);
+  const areaStr = getIdeoLabel(game.leader.personalIdeo).replace(/^[^\s]+\s/, '');
+  const newP = {
+    id: newId,
+    name: pName,
+    short: pShort,
+    leader: game.leader.name,
+    leaderAge: game.leader.age,
+    leaderTrust: 90,
+    nextCongYear: game.date.getFullYear() + 3,
+    personalParty: true,
+    founderLeader: game.leader.name,
+    area: areaStr,
+    coalId: 'none',
+    color: logoCfg.bgColor || '#2563eb',
+    customLogoCfg: logoCfg,
+    emblemType: 1,
+    poll: 0.4,
+    initialPoll: 0.4,
+    seats: 0,
+    inGov: false,
+    credibility: game.leader.prestige,
+    cohesion: 92,
+    orgStrength: 24,
+    wingLeader: rising.name,
+    wingAge: rising.age,
+    wingName: "Area Civica",
+    wingArea: areaStr,
+    factions: [
+      { name: `Area Fondatrice (${game.leader.name})`, leader: game.leader.name, share: 70, desc: "Linea ufficiale del fondatore." },
+      { name: "Area Civica", leader: rising.name, share: 30, desc: "Rete territoriale." }
+    ],
+    splitName: `Alternativa ${pShort}`,
+    splitShort: `A${pShort.slice(0, 2)}`,
+    bio: `Partito fondato da ${game.leader.name}.`,
+    vetoes: [],
+    stances: { ...game.personalStances },
+    baseStances: { ...game.personalStances },
+    baseIdeo: game.leader.personalIdeo,
+    lowPollWeeks: 0,
+    newlyFoundedGraceWeeks: 52
+  };
+  game.parties.push(newP);
+  game.blocSympathy[newId] = {};
+  BLOCS.forEach(b => { game.blocSympathy[newId][b.id] = computeBlocMatch(newP, b) * 0.42; });
+  FALLBACK_REGIONS.forEach(r => { game.regOrg[r.id][newId] = 28; });
+  game.parties.forEach(p => adjPairRel(newId, p.id, 55));
+  game.playerPartyId = newId;
+  game.partyRole = 'secretary';
+  game.selectedDossierPartyId = newId;
+  document.body.classList.remove('theme-ind');
+  const pPol = POLITICIANS.find(x => x.isPlayer || x.name === game.leader.name);
+  if (pPol) {
+    pPol.partyId = newId;
+    if (!game.politicianPartyMap) game.politicianPartyMap = {};
+    game.politicianPartyMap[pPol.id] = newId;
+  }
+  // PUNTO 30: 18 politici per il nuovo partito
+  populateNewPartyPoliticians(newId, 18);
+  recordPoliticianHistory(game.leader.name, `Fonda il nuovo partito politico ${pName} (${pShort})`, `Segretario Fondatore ${pShort}`);
+  recalcPolls(true);
+  addFeed(`🏛️ <strong>NUOVA FORZA POLITICA (0.4%):</strong> L'indipendente <strong>${game.leader.name}</strong> fonda <strong>${pName} (${pShort})</strong> con 18 dirigenti nazionali e logo ufficiale!`, 'ok');
+  setTicker(`NUOVO PARTITO: Registrato al Viminale "${pName}" (${pShort}) di ${game.leader.name}!`);
+  updateAllUI();
+}
+
+function finishPartySplitWithCustomLogo(parentParty, pName, pShort, logoCfg, customStances) {
+  executePartySplit(parentParty, true, customStances, pName, pShort, logoCfg);
+  updateAllUI();
+}
+
+// PUNTO 31 (1.8): Transfughismo parlamentare — richiesta di adesione al partito del giocatore
+export function openDefectionOfferModal(pol, fromParty, toParty) {
+  const p = getP();
+  const seatsNotice = pol.role?.includes('Parlamentare') || pol.role?.includes('Deputato') || pol.role?.includes('Senatore') || pol.clout >= 70;
+  
+  openModal(
+    `🤝 Richiesta di Tesseramento: ${pol.name} (${fromParty.short} → ${toParty.short})`,
+    `<div style="font-size:13px; color:var(--text); line-height:1.55;">
+      Il dirigente politico <strong>${pol.name}</strong> (${pol.age} anni, Prestigio: ${pol.clout}%, Comp.: ${pol.comp}%) è in aperto dissenso con la linea di <strong>${fromParty.name}</strong> e ha chiesto ufficialmente di aderire a <strong>${toParty.name}</strong>!<br><br>
+      • <strong>Rango:</strong> ${pol.role || 'Dirigente Nazionale'}<br>
+      • <strong>Impatto politico se accetti:</strong> ${seatsNotice ? '+1 Seggio a Montecitorio, ' : ''}+0.25% sondaggi per ${toParty.short}, ma -4% coesione interna per malumori delle correnti.<br>
+      • <strong>Se rifiuti:</strong> I quadri storici di ${toParty.short} apprezzano la fermezza ideologica (+3% coesione interna).<br><br>
+      Come Segretario Nazionale di ${toParty.short}, accogli la richiesta di passaggio?
+    </div>`,
+    [
+      {
+        label: `✅ Accetta ${pol.name} nel Partito (+Consenso${seatsNotice ? ', +1 Seggio' : ''})`,
+        fn: () => {
+          const matchPol = POLITICIANS.find(x => x.id === pol.id || x.name === pol.name) || pol;
+          matchPol.partyId = toParty.id;
+          pol.partyId = toParty.id;
+          if (!game.politicianPartyMap) game.politicianPartyMap = {};
+          game.politicianPartyMap[pol.id] = toParty.id;
+          toParty.poll = Math.min(95, +(toParty.poll + 0.25).toFixed(1));
+          if (seatsNotice && fromParty.seats > 0) {
+            fromParty.seats = Math.max(0, fromParty.seats - 1);
+            toParty.seats += 1;
+          }
+          toParty.cohesion = Math.max(20, (toParty.cohesion || 80) - 4);
+          recordPoliticianHistory(pol.name, `Lascia ${fromParty.short} e passa al gruppo parlamentare di ${toParty.short}`, `Dirigente ${toParty.short}`);
+          setBetrayal(fromParty.id, toParty.id, 365, `Passaggio di ${pol.name} da ${fromParty.short} a ${toParty.short}`);
+
+          // PUNTO 7 (1.8.1): Se chi lascia era Segretario, il vecchio partito elegge SUBITO un nuovo Segretario!
+          if (fromParty.leader === pol.name) {
+            const remaining = POLITICIANS.filter(p => p.partyId === fromParty.id && p.id !== pol.id && !p.isPlayer);
+            const newLead = [...remaining].sort((a,b) => (b.clout || b.prestige || 50) - (a.clout || a.prestige || 50))[0] || generateNewPolitician(fromParty.id);
+            fromParty.leader = newLead.name;
+            fromParty.leaderAge = newLead.age;
+            syncPartyNameWithLeader(fromParty, newLead.name);
+            recordPoliticianHistory(newLead.name, `Eletto nuovo Segretario Nazionale di ${fromParty.short} a seguito dell'addio di ${pol.name}`, `Segretario Nazionale ${fromParty.short}`);
+          }
+
+          // PUNTO 9 (1.8.1): Mantiene il bilanciamento del numero di membri generando un sostituto nel vecchio partito
+          generateNewPolitician(fromParty.id);
+
+          addFeed(`🔄 <strong>TRANSFUGHISMO A MONTECITORIO:</strong> <strong>${pol.name}</strong> lascia ${fromParty.short} ed entra ufficialmente in <strong>${toParty.name} (${toParty.short})</strong>!`, 'ok');
+          setTicker(`TRANSFUGHI: ${pol.name} passa a ${toParty.short}!`);
+          closeModal();
+          recalcPolls(true);
+          updateAllUI();
+        }
+      },
+      {
+        label: `❌ Respingi la Richiesta (Difendi la Coerenza Ideologica di ${toParty.short})`,
+        fn: () => {
+          toParty.cohesion = Math.min(100, (toParty.cohesion || 80) + 3);
+          addFeed(`✋ <strong>TESSERAMENTO RESPINTO:</strong> Il Segretario ${game.leader.name} respinge la richiesta di adesione di ${pol.name} (+3% Coesione interna di ${toParty.short}).`);
+          closeModal();
+          updateAllUI();
+        }
+      }
+    ]
+  );
+}
+
 
 export function initDemographicCalibrated() {
       const targetSum = game.parties.reduce((s,p) => s + p.poll, 0);
@@ -91,7 +469,7 @@ export function computeBlocMatch(party, bloc) {
         const isPrio = bloc.prio.includes(k);
         const flag = (party.id === game.playerPartyId && game.flagshipIssues.has(k)) ? 1.35 : 1.0;
         const sal = (game.issueSalience[k] || 15) * (isPrio ? 2.2 : 1.0) * flag;
-        const dist = Math.abs((party.stances[k] ?? 2) - bloc.ideal[k]);
+        const dist = Math.abs((party?.stances?.[k] ?? 2) - bloc.ideal[k]);
         mSum += Math.max(4, 100 - dist * 24) * sal;
         wSum += sal;
       });
@@ -124,6 +502,11 @@ export function recalcPolls(roundVals = true) {
         game.parties.forEach(p => { totals[p.id] += (scores[p.id] / (bSum || 1)) * bloc.share; });
       });
       game.parties.forEach(p => { p.poll = roundVals ? Math.max(0.1, +totals[p.id].toFixed(1)) : Math.max(0.05, totals[p.id]); });
+      // PUNTO 17 (1.8.1): Realismo elettorale partiti territoriali - SVP circoscritta al bacino del Trentino-Alto Adige (0.3%–0.6% nazionale, max 0.7%)
+      const svp = game.parties.find(p => p.id === 'svp');
+      if (svp) {
+        svp.poll = Math.min(0.6, Math.max(0.2, +svp.poll.toFixed(1)));
+      }
       if (roundVals) updateRegPolls();
     }
 
@@ -275,15 +658,19 @@ export function initAllPairRelationsAndCabinet() {
       });
       game.senateSpeaker = POLITICIANS.find(x => x.id === 'larussa') || { id:'larussa', name:'Ignazio La Russa', age:79, partyId:'fdi' };
       game.chamberSpeaker = POLITICIANS.find(x => x.id === 'fontana_l') || { id:'fontana_l', name:'Lorenzo Fontana', age:46, partyId:'lega' };
+      game.governors = JSON.parse(JSON.stringify(INITIAL_GOVERNORS));
+      game.regionalElectionCooldowns = {};
 
-      // Se il giocatore guida un partito minore della coalizione di Governo ed è un leader custom (non Premier), riceve un dicastero di coalizione
+      // Collega il giocatore al politico reale corrispondente (es. Zaia = Governatore Veneto, La Russa = Pres. Senato, Meloni = Premier, Mattarella = Pres. Repubblica) senza assegnare ministeri fittizi!
+      const plPol = ensurePlayerInPoliticians();
+      // Solo se il giocatore ha creato un personaggio custom segretario nazionale di un partito minore di governo e non ha già alcuna carica, può assumere il dicastero del partito
       const pStart = getP();
       const isPremier = (game.currentPM === game.leader.name || game.currentPM === `${game.leader.name} (Tecnico)`);
-      if (pStart && pStart.id !== 'ind' && pStart.inGov && !isPremier && !getPlayerMinistry()) {
-        const plPol = ensurePlayerInPoliticians();
-        const targetMinId = pStart.id === 'fi' ? 'esteri' : (pStart.id === 'lega' ? 'mit' : (pStart.id === 'nm' ? 'mur' : 'turismo'));
-        if (plPol) game.cabinet[targetMinId] = plPol;
+      if (charMode === 'custom' && game.partyRole === 'secretary' && pStart && pStart.id !== 'ind' && pStart.inGov && !isPremier && !getPersonCurrentOffice(game.leader.name)) {
+        const targetMinId = pStart.id === 'fi' ? 'esteri' : (pStart.id === 'lega' ? 'mit' : (pStart.id === 'nm' ? 'mur' : null));
+        if (targetMinId && plPol) game.cabinet[targetMinId] = plPol;
       }
+      enforceSingleOfficeRule();
     }
 
 export function computeCompat(p1, p2) {
@@ -604,16 +991,28 @@ export function checkAndTriggerPremierDefectionCrisis(oldParty, actionDesc) {
 
     /* BUG FIX 1: AVANZAMENTO DEL TEMPO SEMPRE VERITIERO AL 100% (+1G, +7G, +30G) + CAMPAGNA REFERENDARIA 30G (PUNTO 4) + RESET AZIONI GIORNALIERE (PUNTO 10) */
 export function nextTurns(days) {
+      if (game.isDead) {
+        alert("La tua parabola politica e storica si è conclusa con la tua scomparsa terrena.");
+        return;
+      }
       let pendingWorldEvent = false;
       let justFreedFromPrison = false;
       let finishedRef = null;
 
       for (let i = 0; i < days; i++) {
         game.turn++;
-        game.turnActionsUsed = []; // Punto 10 v6.2: ogni nuovo giorno riabilita le azioni politiche!
+        game.turnActionsUsed = [];
         const prevYear = game.date.getFullYear();
-        // Usa il costruttore Date(anno, mese, giorno + 1) per evitare bug di ora legale (DST)
         game.date = new Date(game.date.getFullYear(), game.date.getMonth(), game.date.getDate() + 1);
+
+        // PUNTO 33 (1.8): Controllo mortalità naturale sopra gli 80 anni
+        if (game.leader.age >= 80 && !game.isDead) {
+          const dailyMortalityChance = (game.leader.age - 78) * 0.00015;
+          if (Math.random() < dailyMortalityChance) {
+            triggerPlayerNaturalDeathModal();
+            return;
+          }
+        }
 
         // Sconto giornaliero della pena se il giocatore è personalmente detenuto a Rebibbia
         if (game.isImprisoned && game.prisonDaysLeft > 0) {
@@ -653,19 +1052,19 @@ export function nextTurns(days) {
           annualAgingAndSuccession();
         }
 
-        // Passo settimanale
-        if (game.turn % 7 === 0) {
-          weeklyCommStep();
-          if (!game.isDictatorship) {
-            weeklyAIDynamicsAndCoalitionEvolution();
-            // PUNTO 8 (1.7): Quando il giocatore non è al Governo, l'Esecutivo IA governa attivamente e propone riforme, decreti o referendum!
-            if (!getP().inGov && game.turn % 14 === 0) {
-              weeklyAIGovernmentAction();
-            }
-          } else {
-            weeklyDictatorshipStep();
+        // PUNTO 9 (1.7.1): SIMULAZIONE GIORNALIERA COMPLETA (Fondi, Capitale Politico ⚡, Sondaggi Nazionali e Regionali, Macroeconomia e Dinamiche IA ogni giorno!)
+        weeklyCommStep();
+        if (!game.isDictatorship) {
+          weeklyAIDynamicsAndCoalitionEvolution();
+          // Quando il giocatore non è al Governo, l'Esecutivo IA governa attivamente (probabilità giornaliera calibrata)
+          if (!getP().inGov && Math.random() < 0.08) {
+            weeklyAIGovernmentAction();
           }
-          weeklyMacroStep();
+        } else {
+          weeklyDictatorshipStep();
+        }
+        weeklyMacroStep();
+        if (game.turn % 7 === 0) {
           checkPartyExtinction();
         }
 
@@ -685,29 +1084,24 @@ export function nextTurns(days) {
             if (daysLeft <= 45) {
               startElectoralCampaign("Scadenza naturale della Legislatura a 45 giorni.");
             } else if (game.govStability <= 0) {
-              // Prevenzione limbo elezioni mensili: consultazioni al Quirinale e Governo Tecnico / Unità Nazionale
-              const techPremier = POLITICIANS.find(p => p.partyId === 'tech' && p.age >= 60 && ['draghi_p','franco_p','cartabia_p','panetta_p'].includes(p.id))
-                               || { name: 'Mario Draghi', id: 'draghi_p' };
-              const oldGovPM = game.currentPM;
-              game.currentPM = `${techPremier.name} (Governo Tecnico)`;
-              game.govStability = 75;
-              game.spread = Math.max(70, game.spread - 15);
-              addFeed(`🏛️ <strong>GOVERNO TECNICO AL QUIRINALE:</strong> A seguito della crisi del Governo ${oldGovPM}, il Presidente della Repubblica affida l'incarico a <strong>${techPremier.name}</strong> alla guida di un esecutivo di salvezza nazionale, scongiurando elezioni anticipate immediate!`, 'ok');
-              setTicker(`QUIRINALE: Nominato ${techPremier.name} Premier Tecnico di Unità Nazionale.`);
+              // PUNTO 10 (1.8.2): Modal evidente e drammatico quando il governo cade!
+              triggerDramaticGovFallModal("La stabilità della maggioranza parlamentare è crollata a zero (crisi politica irreversibile tra le forze di governo).");
             }
           }
         }
 
         // Segna se è maturato un evento casuale durante il salto temporale (solo se non sei in carcere)
-        if (game.turn % 14 === 0 && !game.isImprisoned) {
+        if (game.turn % 14 === 0 && !game.isImprisoned && !game.isRetired) {
           pendingWorldEvent = true;
         }
       }
 
+      enforceSingleOfficeRule();
       updateAllUI();
 
       // A fine avanzamento (dopo aver completato tutti i giorni richiesti: +1, +7 o +30), verifica eventuali modal pendenti
       if (!document.getElementById('modalBg').classList.contains('open')) {
+        const dueRegElection = !game.isDictatorship && !game.isImprisoned ? checkScheduledRegionalElections() : null;
         if (finishedRef) {
           resolveActiveReferendumModal(finishedRef);
         } else if (justFreedFromPrison) {
@@ -722,7 +1116,9 @@ export function nextTurns(days) {
         } else if (!game.isDictatorship && !game.isImprisoned && game.date >= game.president.endDate) {
           if (game.stateForm === 'presidenziale') openDirectPresidentialElectionModal();
           else openQuirinaleBallotModal(1);
-        } else if (pendingWorldEvent && !game.isImprisoned) {
+        } else if (dueRegElection) {
+          openRegionalElectionModal(dueRegElection, false);
+        } else if (pendingWorldEvent && !game.isImprisoned && !game.isRetired) {
           triggerWorldEvent();
         }
       }
@@ -761,7 +1157,18 @@ export function resolveActiveReferendumModal(ref) {
           setTicker(`REFERENDUM "${law.title.toUpperCase()}": Vince il SÌ col ${finalYes}%! Cambia la legge in Italia.`);
         } else if (law) {
           game.leader.prestige = Math.max(10, game.leader.prestige - 5);
-          addFeed(`❌ <strong>REFERENDUM BOCCIATO DALLE URNE SU "${law.title.toUpperCase()}":</strong> Dopo 30 giorni di campagna il SÌ si ferma al <strong>${finalYes}%</strong> (NO: ${finalNo}%). Resta in vigore la normativa attuale (Nuovo quesito vietato per 1 anno).`, 'cr');
+          // PUNTO 20 (1.8): Se il quesito era sostenuto dal Governo in carica e perde, l'Esecutivo subisce un forte contraccolpo!
+          if (ref.sponsoredByGov) {
+            game.govStability = Math.max(0, game.govStability - 18);
+            game.spread += 9;
+            game.parties.filter(x => x.inGov).forEach(x => {
+              x.credibility = Math.max(15, x.credibility - 6);
+              x.poll = Math.max(0.5, +(x.poll - 0.5).toFixed(1));
+            });
+            addFeed(`💥 <strong>TERREMOTO POLITICO AL REFERENDUM:</strong> Il quesito sostenuto dal Governo è stato bocciato dai cittadini! Crolla la tenuta dell'Esecutivo (-18% Stabilità, +9 pt Spread)!`, 'cr');
+          } else {
+            addFeed(`❌ <strong>REFERENDUM BOCCIATO DALLE URNE SU "${law.title.toUpperCase()}":</strong> Dopo 30 giorni di campagna il SÌ si ferma al <strong>${finalYes}%</strong> (NO: ${finalNo}%). Resta in vigore la normativa attuale (Nuovo quesito vietato per 1 anno).`, 'cr');
+          }
         }
       } else if (ref.kind === 'treaty') {
         if (won) {
@@ -789,6 +1196,11 @@ export function resolveActiveReferendumModal(ref) {
       document.getElementById('mTitle').textContent = `${won ? '✅ VITTORIA DEL SÌ' : '❌ VITTORIA DEL NO'} — ${ref.title}`;
       document.getElementById('mBody').innerHTML = `
         Si sono chiuse le urne dopo i <strong>30 giorni di Campagna Referendaria</strong> su: <strong>${ref.targetLabel}</strong>.<br><br>
+        ${ref.yesExplanation ? `
+        <div style="background:var(--bg-2); border:1px solid var(--border); border-radius:8px; padding:10px; margin:10px 0; font-size:12px;">
+          <div><strong style="color:#34d399;">Votare SÌ comportava:</strong> ${ref.yesExplanation}</div>
+          <div style="margin-top:4px;"><strong style="color:#f87171;">Votare NO comportava:</strong> ${ref.noExplanation}</div>
+        </div>` : ''}
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; text-align:center; margin:10px 0;">
           <div class="box" style="border-color:${won?'#10b981':'var(--border)'};">
             <div style="font-size:11px; color:var(--muted);">VOTI FAVOREVOLI (SÌ)</div>
@@ -853,11 +1265,8 @@ export function annualAgingAndSuccession() {
       game.leader.age++;
       game.president.age = (game.president.age || 85) + 1;
 
-      if (!game.isDictatorship && game.president.age >= 84 && Math.random() < (game.president.age - 81) * 0.045) {
-        addFeed(`🖤 <strong>LUTTO NAZIONALE AL QUIRINALE:</strong> Si è spento all'età di ${game.president.age} anni il Presidente della Repubblica <strong>${game.president.name}</strong>. Il Presidente del Senato <strong>${game.senateSpeaker?.name || 'in carica'}</strong> assume la supplenza temporanea e convoca le elezioni presidenziali.`, 'cr');
-        setTicker(`LUTTO DI STATO: Scomparso il Presidente ${game.president.name}. Supplenza al Presidente del Senato ${game.senateSpeaker?.name}.`);
-        game.president.endDate = new Date(game.date.getTime());
-      }
+      // PUNTO 12 (1.8.1): Il Presidente della Repubblica resta in carica per l'intero settennato naturale (Art. 85 Cost.)
+      // Rimosso il check annuale arbitrario a 84 anni che provocava due elezioni consecutive premature al Quirinale!
 
       game.parties.forEach(p => {
         p.leaderAge = (p.leaderAge || 52) + 1;
@@ -904,6 +1313,8 @@ export function annualAgingAndSuccession() {
 
       POLITICIANS.forEach((pol, idx) => {
         pol.age = (pol.age || 55) + 1;
+        // PUNTO 33 (1.8): Il giocatore non viene mai sostituito automaticamente!
+        if (pol.isPlayer || pol.name === game.leader.name) return;
         if (pol.age >= 79 && Math.random() < (pol.age - 76) * 0.07) {
           const replacement = generateNewPolitician(pol.partyId);
           addFeed(`🌱 <strong>Ricambio Generazionale:</strong> Si ritira per motivi d'età <strong>${pol.name} (${pol.age}a)</strong>; emerge <strong>${replacement.name} (${replacement.age}a)</strong>.`);
@@ -911,40 +1322,34 @@ export function annualAgingAndSuccession() {
           POLITICIANS[idx] = replacement;
         }
       });
-
-      if (game.leader.age >= 84 && Math.random() < (game.leader.age - 81) * 0.06 && !document.getElementById('modalBg').classList.contains('open')) {
-        const heir = generateNewPolitician(game.playerPartyId);
-        const oldName = game.leader.name;
-        const oldAge = game.leader.age;
-        game.leader.name = heir.name;
-        game.leader.age = heir.age;
-        if (game.partyRole === 'secretary' && game.playerPartyId !== 'ind') getP().leader = heir.name;
-        if (game.currentPM === oldName) game.currentPM = heir.name;
-        addFeed(`🖤 <strong>PASSAGGIO DI TESTIMONE STORICO:</strong> <strong>${oldName}</strong> si spegne a ${oldAge} anni. Il delfino politico <strong>${heir.name} (${heir.age} anni)</strong> raccoglie la sua eredità!`, 'cr');
-      }
     }
 
 export function openPartyCongressModal(party, reason) {
       const isSec = (game.partyRole === 'secretary');
       const opponentName = isSec ? (party.wingLeader || "Sfidante Riformista") : party.leader;
+      game.lastCongressTurn = game.turn;
+
+      // PUNTI 2 & 15 (1.8): I leader storici e radicati godono del peso blindato dell'apparato di partito
+      const isEntrenched = ['Matteo Salvini', 'Giorgia Meloni', 'Giuseppe Conte', 'Elly Schlein', 'Antonio Tajani', 'Carlo Calenda', 'Matteo Renzi'].includes(party.leader) || ((party.leaderTrust || 75) >= 70);
+      const apparatusDefense = isEntrenched ? 32 : 16;
 
       document.getElementById('mTag').textContent = `CONGRESSO NAZIONALE DI ${party.name.toUpperCase()}`;
       document.getElementById('mTitle').textContent = `Elezione del Segretario Nazionale: ${game.leader.name} vs ${opponentName}`;
       document.getElementById('mBody').innerHTML = `
         <strong>${reason}</strong><br><br>
-        I delegati regionali e gli iscritti di <strong>${party.name}</strong> sono chiamati a votare la mozione congressuale per eleggere il Segretario Nazionale.<br>
-        • <strong>Tuo Consenso Interno (Forza Corrente):</strong> <span style="color:#34d399; font-weight:800;">${game.leader.internalSupport}%</span> (Prestigio: ${game.leader.prestige}%)<br>
-        • <strong>Fiducia nella Segreteria attuale:</strong> <strong>${party.leaderTrust || 75}%</strong><br><br>
-        Quale piattaforma congressuale presenti all'Assemblea Nazionale?
+        I delegati regionali e gli iscritti di <strong>${party.name}</strong> sono riuniti al Congresso Nazionale per votare la mozione congressuale.<br>
+        • <strong>Tuo Radicamento Interno (Forza Corrente):</strong> <span style="color:#34d399; font-weight:800;">${game.leader.internalSupport}%</span> (Prestigio: ${game.leader.prestige}%)<br>
+        • <strong>Fiducia nella Segreteria (${party.leader}):</strong> <strong>${party.leaderTrust || 75}%</strong> ${isEntrenched ? '<span style="color:#f59e0b; font-size:11px;">[Leader Storico: apparato blindato]</span>' : ''}<br><br>
+        Quale strategia congressuale adotti all'Assemblea dei Delegati?
       `;
 
       const box = document.getElementById('mChoices');
       box.innerHTML = '';
 
       const opts = [
-        { l:`Mozione di Rilancio Identitario e Battaglia Politica (Investi 25 ⚡)`, d:`Aumenta le tue chance di vittoria del +12% tra i militanti`, bonus:12, costAP:25, costMoney:0 },
-        { l:`Patto Federativo coi Cacicchi, Governatori e Circoli Regionali (Investi € 50k)`, d:`Convince i grandi elettori indecisi (+15% voti congressuali)`, bonus:15, costAP:0, costMoney:50 },
-        { l:`Discorso di Unità del Partito senza correnti`, d:`Nessun costo: ti affidi al tuo attuale radicamento interno (${game.leader.internalSupport}%)`, bonus:3, costAP:0, costMoney:0 }
+        { l:`Mozione di Rilancio Identitario e Battaglia Politica (25 ⚡)`, d:`Mobilitazione dei circoli e dei militanti (+14% forza congressuale)`, bonus:14, costAP:25, costMoney:0 },
+        { l:`Patto Federativo coi Grandi Elettori e Governatori (€ 50k)`, d:`Accordo tra correnti e cacicchi regionali (+18% voti delegati)`, bonus:18, costAP:0, costMoney:50 },
+        { l:`Discorso di Unità del Partito (0 ⚡, € 0k)`, d:`Ti affidi al tuo attuale consenso interno (${game.leader.internalSupport}%)`, bonus:2, costAP:0, costMoney:0 }
       ];
 
       opts.forEach(o => {
@@ -954,7 +1359,19 @@ export function openPartyCongressModal(party, reason) {
         btn.onclick = () => {
           if (game.ap < o.costAP || game.funds < o.costMoney) { alert("Risorse insufficienti per questa mozione!"); return; }
           game.ap -= o.costAP; game.funds -= o.costMoney;
-          const myVoteShare = Math.min(92, Math.max(12, Math.round(game.leader.internalSupport * 0.65 + game.leader.prestige * 0.25 + o.bonus + (Math.random()*10 - 5))));
+          
+          let myVoteShare;
+          if (isSec) {
+            const defensePower = (party.leaderTrust || 75) * 0.50 + game.leader.internalSupport * 0.40 + o.bonus;
+            const challengerPower = (100 - (party.leaderTrust || 75)) * 0.50 + 20;
+            myVoteShare = Math.min(95, Math.max(10, Math.round((defensePower / (defensePower + challengerPower)) * 100) + Math.floor(Math.random()*6 - 3)));
+          } else {
+            // Punti 2 & 15: Per spodestare leader radicati serve un'alta forza corrente e fiducia calata
+            const incumbentPower = (party.leaderTrust || 75) * 0.60 + (party.factions?.[0]?.share || 60) * 0.35 + apparatusDefense;
+            const challengerPower = game.leader.internalSupport * 0.65 + game.leader.prestige * 0.25 + o.bonus;
+            myVoteShare = Math.min(92, Math.max(8, Math.round((challengerPower / (incumbentPower + challengerPower)) * 100) + Math.floor(Math.random()*6 - 3)));
+          }
+
           if (myVoteShare >= 51) {
             if (!isSec) {
               party.wingLeader = party.leader;
@@ -969,7 +1386,7 @@ export function openPartyCongressModal(party, reason) {
             game.leader.internalSupport = Math.min(95, myVoteShare);
             syncPartyNameWithLeader(party, game.leader.name);
             recordPoliticianHistory(game.leader.name, `Eletto Segretario Nazionale al Congresso di ${party.short} col ${myVoteShare}%`, `Segretario Nazionale ${party.short}`);
-            addFeed(`👑 <strong>TRIONFO AL CONGRESSO DI ${party.short}:</strong> <strong>${game.leader.name}</strong> vince con il <strong>${myVoteShare}%</strong> dei voti contro ${opponentName} ed è eletto Segretario Nazionale!`);
+            addFeed(`👑 <strong>TRIONFO AL CONGRESSO DI ${party.short}:</strong> <strong>${game.leader.name}</strong> vince con il <strong>${myVoteShare}%</strong> dei delegati contro ${opponentName} ed è eletto <strong>Segretario Nazionale</strong>!`, 'ok');
             setTicker(`CONGRESSO ${party.short}: ${game.leader.name} eletto Segretario Nazionale col ${myVoteShare}%!`);
           } else {
             if (isSec) {
@@ -980,9 +1397,9 @@ export function openPartyCongressModal(party, reason) {
               recordPoliticianHistory(opponentName, `Eletto Segretario Nazionale al Congresso di ${party.short} col ${100 - myVoteShare}%`, `Segretario Nazionale ${party.short}`);
               recordPoliticianHistory(game.leader.name, `Sconfitto al Congresso di ${party.short}, guida la minoranza interna`, `Capocorrente ${party.short}`);
             }
-            party.leaderTrust = 76;
+            party.leaderTrust = Math.min(95, (party.leaderTrust || 75) + 5);
             game.leader.internalSupport = myVoteShare;
-            addFeed(`⚠️ <strong>ESITO CONGRESSO ${party.short}:</strong> La mozione di ${opponentName} prevale col ${100 - myVoteShare}% (tu ottieni il ${myVoteShare}%). Sei ora il leader della minoranza interna!`, 'cr');
+            addFeed(`⚠️ <strong>ESITO CONGRESSO ${party.short}:</strong> La mozione di ${opponentName} prevale col ${100 - myVoteShare}% (tu ottieni il ${myVoteShare}%). L'apparato del partito ha blindato la segreteria uscente!`, 'cr');
           }
           closeModal(); updateAllUI();
         };
@@ -1004,39 +1421,58 @@ export function startElectoralCampaign(reason) {
 export function weeklyCommStep() {
       const p = getP();
       const s = game.commStrategy;
-      const inc = game.partyRole === 'independent' ? 14 : Math.round(14 + p.poll * 1.4);
-      game.funds = Math.max(0, game.funds + inc - (game.partyRole === 'independent' ? 0 : s.weeklyBudget));
-      game.ap = Math.min(100, game.ap + 18);
-      if (game.partyRole !== 'independent' && game.funds > 0 && s.weeklyBudget > 0) {
+      // PUNTO 9 (1.7.1): Aggiornamento GIORNALIERO calibrato a 1/7 del passo settimanale
+      const dailyInc = (game.partyRole === 'independent' || game.president.isPlayer) ? 2 : Math.max(2, Math.round((14 + p.poll * 1.4) / 7));
+      const dailySpend = (game.partyRole === 'independent' || game.president.isPlayer) ? 0 : Math.round((s.weeklyBudget || 0) / 7);
+      game.funds = Math.max(0, Math.round(game.funds + dailyInc - dailySpend));
+      game.ap = Math.min(100, game.ap + 3); // +3 ⚡ al giorno (+21 ⚡ a settimana)
+      if (game.partyRole !== 'independent' && !game.president.isPlayer && game.funds > 0 && s.weeklyBudget > 0) {
         const pwr = (s.weeklyBudget / 35) * (p.credibility / 80);
-        game.issueSalience[s.focusIssue] = Math.min(45, (game.issueSalience[s.focusIssue] || 18) + 1.2);
+        game.issueSalience[s.focusIssue] = Math.min(45, +((game.issueSalience[s.focusIssue] || 18) + (1.2 / 7)).toFixed(2));
         [s.targetBloc1, s.targetBloc2].forEach(bId => {
           const bloc = BLOCS.find(x => x.id === bId);
-          if (bloc && computeBlocMatch(p, bloc) >= 48) shiftBloc(p.id, bId, 1.3 * pwr);
+          if (bloc && computeBlocMatch(p, bloc) >= 48) shiftBloc(p.id, bId, (1.3 / 7) * pwr);
         });
+      }
+      // Oscillazione fisiologica giornaliera dei consensi nei bacini elettorali
+      if (!game.isDictatorship && game.parties.length > 0) {
+        const randParty = game.parties[game.turn % game.parties.length];
+        const randBloc = BLOCS[(game.turn * 3) % BLOCS.length];
+        if (randParty && randBloc && game.blocSympathy[randParty.id]) {
+          const match = computeBlocMatch(randParty, randBloc);
+          const microDelta = ((match - 60) * 0.0018) + ((Math.random() - 0.5) * 0.012);
+          game.blocSympathy[randParty.id][randBloc.id] = Math.max(0.5, (game.blocSympathy[randParty.id][randBloc.id] || 15) * (1 + microDelta));
+        }
       }
       recalcPolls(true);
     }
 
-    /* PUNTO 17: DINAMICA SETTIMANALE DELLA DITTATURA (CONSENSO POPOLARE VS RISCHIO RIVOLTA) */
+    /* PUNTO 17: DINAMICA GIORNALIERA DELLA DITTATURA (CONSENSO POPOLARE VS RISCHIO RIVOLTA) */
 export function weeklyDictatorshipStep() {
       const p = getP();
       const popSupport = p.poll;
-      // Se la dittatura ha un forte consenso popolare (>= 30%) e il PIL è positivo, il rischio di rivolta cala; se il consenso è basso (< 20%), il rischio di rivolta sale rapidamente!
       let deltaRevolt = 0;
-      if (popSupport < 15) deltaRevolt += 6;
-      else if (popSupport < 24) deltaRevolt += 3;
-      else if (popSupport >= 34) deltaRevolt -= 2;
 
-      if (game.gdp < 0) deltaRevolt += 2;
-      if (game.spread > 260) deltaRevolt += 2;
-      if (game.militaryLoyalty >= 75) deltaRevolt -= 1;
+      // PUNTO 13 (1.8): Messa al bando dei partiti alimenta la resistenza clandestina e impedisce che il rischio rivolta resti bloccato al 2%!
+      const outlawedCount = game.outlawedParties ? game.outlawedParties.length : 0;
+      if (outlawedCount > 0) {
+        deltaRevolt += (outlawedCount * 0.28) / 7;
+        if (popSupport < 25) deltaRevolt += (3 / 7);
+      } else {
+        if (popSupport < 15) deltaRevolt += (6 / 7);
+        else if (popSupport < 24) deltaRevolt += (3 / 7);
+        else if (popSupport >= 34) deltaRevolt -= (2 / 7);
+      }
 
-      game.revoltRisk = Math.max(2, Math.min(100, game.revoltRisk + deltaRevolt));
+      if (game.gdp < 0) deltaRevolt += (2 / 7);
+      if (game.spread > 260) deltaRevolt += (2 / 7);
+      if (game.militaryLoyalty >= 75) deltaRevolt -= (1 / 7);
+
+      game.revoltRisk = Math.max(2, Math.min(100, +(game.revoltRisk + deltaRevolt).toFixed(1)));
       game.govStability = Math.max(5, 100 - Math.round(game.revoltRisk * 0.8));
 
-      if (game.revoltRisk >= 75 && game.revoltRisk < 100) {
-        addFeed(`🔥 <strong>ALLARME RIVOLTA CONTRO IL REGIME (${game.revoltRisk}%):</strong> Scioperi generali clandestini e manifestazioni nelle piazze minacciano la tua Dittatura (Consenso popolare: ${popSupport.toFixed(1)}%)!`, 'cr');
+      if (game.revoltRisk >= 75 && game.revoltRisk < 100 && game.turn % 7 === 0) {
+        addFeed(`🔥 <strong>ALLARME RIVOLTA CONTRO IL REGIME (${Math.round(game.revoltRisk)}%):</strong> Scioperi generali clandestini e manifestazioni nelle piazze minacciano la tua Dittatura (Consenso popolare: ${popSupport.toFixed(1)}%)!`, 'cr');
       }
       if (game.revoltRisk >= 100) {
         triggerRegimeOverthrow();
@@ -1065,6 +1501,8 @@ export function triggerRegimeOverthrow() {
     }
 
 export function weeklyAIDynamicsAndCoalitionEvolution() {
+      // PUNTO 9 (1.7.1): Eseguito giornalmente con probabilità calibrate a 1/7 della frequenza settimanale
+      if (Math.random() > 0.16) return;
       const aiList = game.parties.filter(p => p.id !== game.playerPartyId);
       const actor = aiList[Math.floor(Math.random() * aiList.length)];
       if (!actor) return;
@@ -1090,11 +1528,23 @@ export function weeklyAIDynamicsAndCoalitionEvolution() {
       } else {
         const targetCoalIds = Array.from(new Set(game.parties.map(p=>p.coalId))).filter(c => c !== 'none');
         for (const cid of targetCoalIds) {
+          const cLead = getCoalLeaderParty(cid);
+          // PUNTO 12 (1.8.2): Compatibilità ideologica minima: partiti storicamente opposti non entrano a caso
+          if (cLead) {
+            const ideoDist = Math.abs(getPartyIdeoScore(actor) - getPartyIdeoScore(cLead));
+            if (ideoDist > 1.25) continue;
+          }
           const vote = checkCoalitionAdmissionVote(cid, actor);
           if (vote.approved && Math.random() < 0.30) {
-            actor.coalId = cid;
-            addFeed(`🤝 <strong>RICONFIGURAZIONE ALLEANZE:</strong> Con il voto favorevole dei membri (${vote.pct}%), <strong>${actor.name}</strong> entra in <strong>${getCoalName(cid)}</strong>!`, 'ai');
-            break;
+            // Se il giocatore guida la coalizione, non si entra senza il suo consenso esplicito via modal!
+            if (cLead && cLead.id === game.playerPartyId) {
+              openCoalitionAdmissionRequestModal(actor, cid);
+              break;
+            } else {
+              actor.coalId = cid;
+              addFeed(`🤝 <strong>RICONFIGURAZIONE ALLEANZE:</strong> Con il voto favorevole dei membri (${vote.pct}%), <strong>${actor.name}</strong> entra in <strong>${getCoalName(cid)}</strong>!`, 'ai');
+              break;
+            }
           }
         }
       }
@@ -1141,17 +1591,21 @@ export function weeklyAIDynamicsAndCoalitionEvolution() {
         // L'IA oscilla vicino alla propria identità storica senza snaturarsi
         const nextVal = cur === baseVal ? (Math.random() > 0.5 ? Math.min(4, cur+1) : Math.max(0, cur-1)) : baseVal;
         actor.stances[hotKey] = nextVal;
-      } else if (actor.poll >= 6.0 && actor.wingLeader && game.parties.length < 28) {
-        actor.cohesion = Math.max(20, (actor.cohesion || 75) - 5);
-        if (actor.cohesion <= 40) {
-          executePartySplit(actor, false);
-        }
+      } else if (actor.poll >= 7.0 && actor.wingLeader && (actor.cohesion || 75) <= 28 && Math.random() < 0.18 && game.parties.length < 26) {
+        // PUNTO 28 (1.8): Frequenza delle scissioni IA notevolmente ridotta e selettiva
+        executePartySplit(actor, false);
       }
+
+      // PUNTI 5, 7, 8, 9, 10 (1.8.1): Transfughismo universale e realistico (frequenza moderata: ~ogni 35 turni, affinità ideologica <= 0.8, no estremi opposti)
+      if (game.turn % 35 === 0 && Math.random() < 0.45 && !document.getElementById('modalBg').classList.contains('open') && !game.isRetired) {
+        triggerAiPoliticianDefection();
+      }
+
       recalcDynamicVetoes();
       recalcPolls(true);
     }
 
-export function executePartySplit(parentParty, isPlayerSplitting, customStances = null) {
+export function executePartySplit(parentParty, isPlayerSplitting, customStances = null, customName = null, customShort = null, customLogoCfg = null) {
       const wasPM = (isPlayerSplitting && game.currentPM === game.leader.name);
       const splitId = 'split_' + parentParty.id + '_' + game.turn;
       const splitShare = 0.28;
@@ -1188,15 +1642,15 @@ export function executePartySplit(parentParty, isPlayerSplitting, customStances 
       const pool = (typeof SPLIT_POOLS !== 'undefined' && SPLIT_POOLS[fam]) ? SPLIT_POOLS[fam] : [];
       const unusedEntry = pool.find(item => !game.parties.some(p => p.short === item.short || p.name === item.name)) || pool[0];
 
-      const splitChosenName = unusedEntry ? unusedEntry.name : `Alternativa ${parentParty.short}`;
-      const splitChosenShort = unusedEntry ? unusedEntry.short : `N${parentParty.short.slice(0,2)}`;
-      const splitChosenColor = (unusedEntry && unusedEntry.color) || uniqueColor;
+      const splitChosenName = customName || (unusedEntry ? unusedEntry.name : `Alternativa ${parentParty.short}`);
+      const splitChosenShort = customShort || (unusedEntry ? unusedEntry.short : `N${parentParty.short.slice(0,2)}`);
+      const splitChosenColor = (customLogoCfg && customLogoCfg.bgColor) || (unusedEntry && unusedEntry.color) || uniqueColor;
       const splitWingName = (unusedEntry && unusedEntry.wing) || "Area Riformista";
 
       const newParty = {
         id:splitId,
-        name:isPlayerSplitting ? (prompt("Nome del tuo nuovo partito scissionista:", splitChosenName) || splitChosenName) : splitChosenName,
-        short:isPlayerSplitting ? (prompt("Sigla del tuo nuovo partito (2-4 lettere):", splitChosenShort) || splitChosenShort) : splitChosenShort,
+        name:splitChosenName,
+        short:splitChosenShort,
         leader:newLeaderName,
         leaderAge:newLeaderAge,
         leaderTrust:88,
@@ -1206,6 +1660,7 @@ export function executePartySplit(parentParty, isPlayerSplitting, customStances 
         area:getIdeoLabel(getPartyIdeoScore({stances:newStances})).replace(/^[^\s]+\s/, ''),
         coalId:'none',
         color:splitChosenColor,
+        customLogoCfg: customLogoCfg || null,
         emblemType:uniqueEmblem,
         poll:+(parentParty.poll * splitShare).toFixed(1),
         seats:movedSeats,
@@ -1273,19 +1728,29 @@ export function executePartySplit(parentParty, isPlayerSplitting, customStances 
       recordPoliticianHistory(newLeaderName, `Guida la scissione da ${parentParty.short} e fonda ${newParty.name} (${newParty.short})`, `Segretario Fondatore ${newParty.short}`);
       recordPoliticianHistory(risingWing.name, `Cofondatore e Capocorrente di ${newParty.name} (${newParty.short})`, `Capocorrente ${newParty.short}`);
 
-      // Trasferisce 3 esponenti dal partito madre al nuovo partito scissionista e genera rinforzi per entrambi
-      const defectingPols = POLITICIANS.filter(x => x.partyId === parentParty.id && x.name !== parentParty.leader && !x.isPlayer).slice(0, 3);
+      // Trasferisce esponenti dal partito madre al nuovo partito scissionista
+      const defectingPols = POLITICIANS.filter(x => x.partyId === parentParty.id && x.name !== parentParty.leader && !x.isPlayer).slice(0, 4);
       defectingPols.forEach(dp => {
         dp.partyId = newParty.id;
+        if (!game.politicianPartyMap) game.politicianPartyMap = {};
         game.politicianPartyMap[dp.id] = newParty.id;
         recordPoliticianHistory(dp.name, `Lascia ${parentParty.short} e aderisce alla scissione di ${newParty.name} (${newParty.short})`, `Dirigente Nazionale ${newParty.short}`);
-        // Rigenera un nuovo quadro dirigente nel partito madre per mantenerne l'organico completo
         generateNewPolitician(parentParty.id);
       });
-      // Aggiunge altri 3 quadri emergenti al nuovo partito scissionista così ha subito un roster nutrito
-      for (let k = 0; k < 3; k++) {
-        generateNewPolitician(newParty.id);
+
+      // PUNTO 30 (1.8): Assegna un roster completo di 18 politici per il nuovo partito scissionista
+      populateNewPartyPoliticians(newParty.id, 18);
+
+      // PUNTO 28 (1.8): Sincronizza i governatori se il leader scissionista era un governatore
+      if (game.governors) {
+        for (const [rId, gObj] of Object.entries(game.governors)) {
+          if (gObj && (gObj.name === newLeaderName || gObj.polId === leaderPolObj?.id)) {
+            gObj.partyId = newParty.id;
+            gObj.coalId = 'none';
+          }
+        }
       }
+      enforceSingleOfficeRule();
 
       recalcPolls(true);
       addFeed(`🚨 <strong>SCISSIONE TRAUMATICA IN PARLAMENTO!</strong> <strong>${newParty.leader}</strong> rompe con ${parentParty.name} e fonda <strong>${newParty.name} (${newParty.short})</strong> portando via ${movedSeats} deputati!`, 'cr');
@@ -1303,33 +1768,50 @@ export function weeklyMacroStep() {
       const b = game.budget;
       const fedBonus = game.stateForm === 'federale' ? 0.015 : 0;
       const russiaGasBonus = game.foreignRels.russia >= 60 ? 0.01 : 0;
-      game.gdp = Math.max(-2.8, Math.min(3.5, +(game.gdp + (b.investSpend - 3.2)*0.04 - (b.taxPressure - 42.0)*0.03 + (avgComp - 78)*0.004 + fedBonus + russiaGasBonus).toFixed(2)));
+      // PUNTO 9 (1.7.1): Evoluzione macroeconomica giornaliera (1/7 del passo settimanale)
+      const dailyGdpDelta = ((b.investSpend - 3.2)*0.04 - (b.taxPressure - 42.0)*0.03 + (avgComp - 78)*0.004 + fedBonus + russiaGasBonus) / 7;
+      game.gdp = Math.max(-2.8, Math.min(3.5, +(game.gdp + dailyGdpDelta).toFixed(2)));
       b.deficit = +(b.healthSpend + b.eduSpend + b.pensionSpend + b.investSpend + game.defenseSpendGDP + 12.9 - b.taxPressure).toFixed(1);
-      b.debtToGDP = +(b.debtToGDP + (b.deficit - game.gdp)*0.04).toFixed(1);
+      b.debtToGDP = +(b.debtToGDP + ((b.deficit - game.gdp)*0.04) / 7).toFixed(2);
       const euPenalty = !game.inEU ? 35 : (game.foreignRels.eu_com < 40 ? 12 : 0);
-      game.spread = Math.max(60, Math.min(520, Math.round(game.spread + (b.deficit - 3.0)*3.2 + (70 - game.govStability)*0.20 - (avgComp - 80)*0.4 + euPenalty * 0.08)));
+      const dailySpreadDelta = ((b.deficit - 3.0)*3.2 + (70 - game.govStability)*0.20 - (avgComp - 80)*0.4 + euPenalty * 0.08) / 7 + (Math.random() - 0.5) * 0.9;
+      game.spread = Math.max(60, Math.min(520, Math.round(game.spread + dailySpreadDelta)));
 
-      // Punto 19: Feedback macroeconomico realistico sulla tenuta del governo e consensi
-      if (game.spread > 200 || game.gdp < -0.5) {
-        const severity = (game.spread > 260 || game.gdp < -1.2) ? 2 : 1;
-        if (!game.isDictatorship) {
-          game.govStability = Math.max(0, game.govStability - 3 * severity);
+      // Aggiornamento giornaliero del gradimento dei Governatori Regionali (PUNTO 10)
+      if (game.governors) {
+        for (const [regId, gov] of Object.entries(game.governors)) {
+          if (!gov) continue;
+          const rPolls = game.regionPolls?.[regId] || {};
+          const govPartyPoll = rPolls[gov.partyId] || 15;
+          const healthFactor = (b.healthSpend - 6.5) * 0.06;
+          const drift = ((govPartyPoll - 18) * 0.004 + healthFactor + (Math.random() - 0.5) * 0.25);
+          gov.approval = Math.max(22, Math.min(85, Math.round((gov.approval || 55) + drift)));
         }
-        game.parties.filter(p=>p.inGov).forEach(p => {
-          p.credibility = Math.max(20, p.credibility - 2 * severity);
-          p.poll = Math.max(1.0, +(p.poll - 0.12 * severity).toFixed(1));
-          game.allySatisfaction[p.id] = Math.max(15, (game.allySatisfaction[p.id] || 75) - 3 * severity);
-        });
-        if (game.spread > 230) {
-          addFeed(`🚨 <strong>FIBRILLAZIONE ECONOMICA:</strong> Spread a <strong>${game.spread} pt</strong> e PIL a <strong>${game.gdp}%</strong>: la maggioranza trema, calano i consensi del Governo (-Stabilità, -Fiducia Alleati)!`, 'cr');
+      }
+
+      // Feedback macroeconomico realistico sulla tenuta del governo e consensi (calibrato sul passo settimanale)
+      if (game.turn % 7 === 0) {
+        if (game.spread > 200 || game.gdp < -0.5) {
+          const severity = (game.spread > 260 || game.gdp < -1.2) ? 2 : 1;
+          if (!game.isDictatorship) {
+            game.govStability = Math.max(0, game.govStability - 3 * severity);
+          }
+          game.parties.filter(p=>p.inGov).forEach(p => {
+            p.credibility = Math.max(20, p.credibility - 2 * severity);
+            p.poll = Math.max(1.0, +(p.poll - 0.12 * severity).toFixed(1));
+            game.allySatisfaction[p.id] = Math.max(15, (game.allySatisfaction[p.id] || 75) - 3 * severity);
+          });
+          if (game.spread > 230) {
+            addFeed(`🚨 <strong>FIBRILLAZIONE ECONOMICA:</strong> Spread a <strong>${game.spread} pt</strong> e PIL a <strong>${game.gdp}%</strong>: la maggioranza trema, calano i consensi del Governo (-Stabilità, -Fiducia Alleati)!`, 'cr');
+          }
+        } else if (game.spread <= 110 && game.gdp >= 1.0) {
+          game.govStability = Math.min(100, game.govStability + 2);
+          game.parties.filter(p=>p.inGov).forEach(p => {
+            p.credibility = Math.min(95, p.credibility + 1);
+            p.poll = Math.min(45.0, +(p.poll + 0.1).toFixed(1));
+            game.allySatisfaction[p.id] = Math.min(100, (game.allySatisfaction[p.id] || 75) + 2);
+          });
         }
-      } else if (game.spread <= 110 && game.gdp >= 1.0) {
-        game.govStability = Math.min(100, game.govStability + 2);
-        game.parties.filter(p=>p.inGov).forEach(p => {
-          p.credibility = Math.min(95, p.credibility + 1);
-          p.poll = Math.min(45.0, +(p.poll + 0.1).toFixed(1));
-          game.allySatisfaction[p.id] = Math.min(100, (game.allySatisfaction[p.id] || 75) + 2);
-        });
       }
     }
 
@@ -1361,7 +1843,7 @@ export function weeklyAIGovernmentAction() {
           if (passed) {
             game.lawStates[law.id] = targetOpt.idx;
             if (targetOpt.eff) targetOpt.eff(game);
-            const cleanSt = targetOpt.status.replace(/^[🟢🟡🔴]\s*/, '');
+            const cleanSt = targetOpt.status.replace(/^(?:🟢|🟡|🔴)\s*/u, '');
             addFeed(`🏛️ <strong>RIFORMA DEL GOVERNO ${game.currentPM.toUpperCase()} APPROVATA IN AULA:</strong> La maggioranza (${govSeats} seggi, guida ${leadGovParty.short}) approva il DDL su <strong>${law.title}</strong> → entra in vigore: <em>${cleanSt}</em>! Puoi raccogliere le firme per un Referendum Abrogativo nella scheda Temi Caldi.`, 'ai');
             setTicker(`MONTECITORIO: Il Governo ${game.currentPM} approva la riforma su "${law.title}" (${cleanSt})!`);
           } else {
@@ -1398,7 +1880,7 @@ export function weeklyAIGovernmentAction() {
         const curIdx = game.lawStates[law.id] ?? law.currentIdx;
         const targetOpt = law.options.find(o => o.idx !== curIdx) || law.options[0];
         if (targetOpt && (game.referendumCooldowns[law.id] || 0) <= game.turn) {
-          const cleanLbl = targetOpt.status.replace(/^[🟢🟡🔴]\s*/, '');
+          const cleanLbl = targetOpt.status.replace(/^(?:🟢|🟡|🔴)\s*/u, '');
           game.activeReferendum = {
             kind: 'law',
             lawId: law.id,
@@ -1516,8 +1998,9 @@ export function triggerWorldEvent() {
 export function openDirectPresidentialElectionModal() {
       const player = getP();
       const sortedP = [...game.parties].sort((a,b) => b.poll - a.poll);
+      const presTermLimitReached = (game.president.name === game.leader.name && (game.presTermsServed || 1) >= 2);
       const topCandidates = [
-        { name:game.leader.name, age:game.leader.age, area:player.area, partyName:player.name, pollBase:Math.max(22, player.poll + game.leader.prestige * 0.22), isPlayer:true },
+        ...(!presTermLimitReached ? [{ name:game.leader.name, age:game.leader.age, area:player.area, partyName:player.name, pollBase:Math.max(22, player.poll + game.leader.prestige * 0.22), isPlayer:true }] : []),
         ...sortedP.filter(x => x.id !== player.id).slice(0, 3).map(x => ({
           name:x.leader, age:x.leaderAge, area:x.area, partyName:x.name, pollBase:x.poll + 8, isPlayer:false
         }))
@@ -1548,7 +2031,9 @@ export function openDirectPresidentialElectionModal() {
           game.president.isPlayer = !!winner.isPlayer;
           game.currentPM = winner.name;
           game.govStability = 88;
-          recordPoliticianHistory(winner.name, `Eletto direttamente dai cittadini Presidente della Repubblica e Capo dell'Esecutivo`, `Presidente della Repubblica`);
+          const isReelected = (winner.name === game.president.name);
+          game.presTermsServed = isReelected ? ((game.presTermsServed || 1) + 1) : 1;
+          recordPoliticianHistory(winner.name, `Eletto direttamente dai cittadini Presidente della Repubblica e Capo dell'Esecutivo (${game.presTermsServed}° Mandato)`, `Presidente della Repubblica`);
           addFeed(`🦅 <strong>ELEZIONI PRESIDENZIALI DIRETTE:</strong> Il popolo italiano elegge <strong>${winner.name}</strong> Presidente della Repubblica${winner.isPlayer ? ' (SEI SALITO AL QUIRINALE E GUIDI L\'ESECUTIVO!)' : ''}!`);
           setTicker(`QUIRINALE PRESIDENZIALE: ${winner.name} eletto direttamente dai cittadini italiani!`);
           closeModal(); updateAllUI();
@@ -1588,6 +2073,11 @@ export function openQuirinaleBallotModal(ballotNum = 1) {
           partyBadge: 'Indipendente / Super Partes (Nessun partito)'
         };
       };
+
+      // PUNTO 5 & 6 (1.8.2): RISOLUZIONE DEFINITIVA QUIRINALE
+      // - Chi ha 0 seggi (extraparlamentare) NON può votare nell'urna, solo rilasciare endorsement o assistere
+      // - Eliminazione totale degli scrutini infiniti: dal 4° scrutinio convergenza progressiva, con fumata bianca garantita entro il 5° o 6° scrutinio
+      const isExtraParliamentary = (player.seats === 0);
 
       // Punto 8: Candidati PdR dinamici da POLITICIANS con age >= 50 e alto profilo
       const eligiblePols = POLITICIANS.filter(p => p.age >= 50 && (p.clout >= 65 || p.comp >= 82) && !p.isPlayer);
@@ -1638,7 +2128,8 @@ export function openQuirinaleBallotModal(ballotNum = 1) {
         if (bestCand && aiSupport[bestCand.id]) aiSupport[bestCand.id].push(p);
       });
 
-      const convergenceBonus = ballotNum <= 2 ? 0 : (ballotNum === 3 ? 24 : (ballotNum === 4 ? 50 : (ballotNum === 5 ? 88 : 140)));
+      // Calcolo bonus di convergenza: a partire dal 4° scrutinio il Parlamento converge verso una figura condivisa
+      const convergenceBonus = ballotNum <= 2 ? 0 : (ballotNum === 3 ? 35 : (ballotNum === 4 ? 75 : (ballotNum === 5 ? 130 : 210)));
 
       document.getElementById('mTag').textContent = `🗳️ ELEZIONE DEL PRESIDENTE DELLA REPUBBLICA • ${ballotNum}° SCRUTINIO (QUORUM: ${quorum} SU 400)`;
       document.getElementById('mTitle').textContent = `👑 Elezione del Presidente della Repubblica — ${ballotNum}° Scrutinio (Parlamento in Seduta Comune)`;
@@ -1649,9 +2140,13 @@ export function openQuirinaleBallotModal(ballotNum = 1) {
           • <strong>1°–3° Scrutinio:</strong> richiesta la maggioranza qualificata dei <strong>2/3 (267 voti)</strong>.<br>
           • <strong>Dal 4° Scrutinio:</strong> sufficiente la <strong>maggioranza assoluta (201 voti)</strong>.
         </div>
-        ${isIndependentWithoutSeats
-          ? `<strong>⚠️ NOTA COSTITUZIONALE (Art. 83 Cost.):</strong> Sei una personalità Indipendente esterna al Parlamento (<strong>0 Grandi Elettori</strong>). Non puoi inserire schede nell'urna, ma puoi rilasciare un <em>Endorsement Pubblico</em> per orientare i parlamentari d'area o candidarti tu stesso se hai compiuto 50 anni!`
-          : `Controlli direttamente <strong>${player.seats} grandi elettori</strong> (${game.partyRole === 'independent' ? 'Indipendente' : player.name}). Scegli quale candidato votare per la <strong>Presidenza della Repubblica</strong>:`
+        ${isExtraParliamentary
+          ? `<div style="background:rgba(239,68,68,0.12); border:1px solid #ef4444; border-radius:8px; padding:8px 11px; margin-bottom:8px; font-size:12px; color:var(--text);">
+              ⚠️ <strong>PREROGATIVA PARLAMENTARE (Art. 83 Cost.):</strong><br>
+              Non fai parte del Parlamento (<strong>0 Grandi Elettori</strong>): in quanto esponente extraparlamentare o civico senza seggi a Montecitorio <strong>non puoi votare nell'urna</strong>.<br>
+              Puoi però rilasciare un <strong>Endorsement Pubblico</strong> a sostegno di un candidato per orientare il voto dei parlamentari o assistere all'esito dello scrutinio d'Aula!
+            </div>`
+          : `Controlli direttamente <strong>${player.seats} grandi elettori</strong> (${game.partyRole === 'independent' ? 'Indipendente' : player.name}). Scegli quale candidato votare nell'urna di Montecitorio per la <strong>Presidenza della Repubblica</strong>:`
         }
       `;
 
@@ -1672,21 +2167,21 @@ export function openQuirinaleBallotModal(ballotNum = 1) {
           const reach = 1.25 + (ballotNum >= 4 ? 0.65 : 0);
           allies = game.parties.filter(p => p.id !== player.id && p.seats > 0 && !baseSup.includes(p) && Math.abs(getPartyIdeoScore(p) - cand.idealIdeo) <= reach);
         }
-        const playerContributedSeats = isIndependentWithoutSeats ? 0 : player.seats;
+        const playerContributedSeats = isExtraParliamentary ? 0 : player.seats;
         const prestigeVotes = cand.isPlayer ? Math.round(game.leader.prestige * 0.65) : Math.round((cand.trust || 75) * 0.45);
         const estTotal = Math.min(385, baseVotes + allies.reduce((s,p)=>s+p.seats,0) + (cand.isPlayer ? playerContributedSeats : 0) + prestigeVotes + convergenceBonus);
         return { cand, baseSup, allies, estTotal };
       });
 
       const electWinner = (winnerCand, votes, noteTxt = '') => {
-        // Punto 6 & 7: Incompatibilità assoluta Art. 84 c. 2 Cost. e rimozione della vecchia carica ministeriale dal sottotitolo del Quirinale!
         vacateOfficesForPresident(winnerCand.name);
 
         game.president.name = winnerCand.name;
         game.president.age = winnerCand.age;
+        // PUNTO 8 (1.8): Dicitura istituzionale fattuale senza filler o formule enfatiche
         game.president.area = winnerCand.partyShort
-          ? `Garante della Costituzione (Ex ${winnerCand.partyShort})`
-          : 'Garante della Costituzione — Super Partes';
+          ? `Presidente della Repubblica (Area ${winnerCand.partyShort})`
+          : 'Presidente della Repubblica — Super Partes';
         game.president.endDate = new Date(game.date.getFullYear() + 7, game.date.getMonth(), game.date.getDate());
         game.president.trust = winnerCand.trust || 85;
         game.president.isPlayer = !!winnerCand.isPlayer;
@@ -1695,44 +2190,147 @@ export function openQuirinaleBallotModal(ballotNum = 1) {
         recordPoliticianHistory(winnerCand.name, `Eletto Presidente della Repubblica Italiana (${ballotNum}° scrutinio, ${votes} voti)`, 'Presidente della Repubblica');
 
         if (winnerCand.isPlayer) {
-          game.partyRole = 'president_rep';
+          // PUNTI 7 & 29 (1.8): L'elezione al Quirinale NON revoca la Segreteria di Partito (game.partyRole rimane intatto)!
           game.president.isPlayer = true;
           game.leader.prestige = Math.min(100, game.leader.prestige + 16);
-          addFeed(`👑 <strong>STORICA FUMATA BIANCA AL ${ballotNum}° SCRUTINIO (${votes} voti)!</strong> <strong>${game.leader.name}</strong> è eletto <strong>Presidente della Repubblica Italiana</strong>! Ti insedi al Colle per il settennato da Presidente della Repubblica super partes (poteri presidenziali sbloccati nella scheda Parlamento & Colle)!`, 'ok');
+          addFeed(`👑 <strong>STORICA FUMATA BIANCA AL ${ballotNum}° SCRUTINIO (${votes} voti)!</strong> <strong>${game.leader.name}</strong> è eletto <strong>Presidente della Repubblica Italiana</strong>! Ti insedi al Colle per il settennato (poteri presidenziali sbloccati nella scheda Parlamento & Colle)!`, 'ok');
           setTicker(`HABEMUS PRAESIDENTEM: ${game.leader.name} eletto Presidente della Repubblica con ${votes} voti!`);
         } else {
           addFeed(`🔔 <strong>FUMATA BIANCA AL ${ballotNum}° SCRUTINIO (${votes} voti)!</strong> <strong>${winnerCand.name} (${winnerCand.age}a)</strong> è eletto Presidente della Repubblica! ${noteTxt}`);
           setTicker(`QUIRINALE: ${winnerCand.name} eletto Presidente della Repubblica al ${ballotNum}° scrutinio (${votes} voti)!`);
         }
+        syncAllPoliticianCareersWithCurrentState();
         closeModal();
         updateAllUI();
       };
 
+      // PUNTO 13 (1.8.1) & PUNTI 5-6 (1.8.2): Scrutinio Segreto reale di tutti i 400 Grandi Elettori del Parlamento
       computedCands.forEach(({ cand, baseSup, allies, estTotal }) => {
         const btn = document.createElement('button');
         btn.className = 'm-btn';
         btn.style.borderColor = cand.isPlayer ? 'var(--gold)' : '';
-        const actionLabel = isIndependentWithoutSeats
-          ? (cand.isPlayer ? `👑 CANDIDATI COME PERSONALITÀ INDIPENDENTE: ${cand.name}` : `📣 Endorsement Pubblico per ${cand.name}`)
+        const actionLabel = isExtraParliamentary
+          ? (cand.isPlayer ? `👑 AUTOCANDIDATURA DA INDIPENDENTE: ${cand.name}` : `📣 Endorsement Pubblico per ${cand.name}`)
           : (cand.isPlayer ? `👑 CANDIDATI TU STESSO AL QUIRINALE: ${cand.name}` : `🗳️ Vota ${cand.name}`);
 
         btn.innerHTML = `
-          <strong>${actionLabel} (${cand.age}a) — [${cand.partyBadge || cand.area}] — Stima Voti: ~${estTotal} / ${quorum}</strong>
-          <span>${cand.isPlayer ? `Grandi elettori convergenti: ${allies.map(p=>p.short).join(', ') || 'Trasversali'} — ${cand.desc}` : `Voti base: ${baseSup.map(p=>p.short).join(', ') || 'Trasversali'} ${allies.length ? `• Convergenza: +${allies.map(p=>p.short).join(', ')}` : ''} — ${cand.desc}`}</span>
+          <strong>${actionLabel} (${cand.age}a) — [${cand.partyBadge || cand.area}] — Seggi Base: ~${estTotal}</strong>
+          <span>${cand.isPlayer ? `Grandi elettori convergenti: ${allies.map(p=>p.short).join(', ') || 'Trasversali'} — ${cand.desc}` : `Voti stimati area: ${baseSup.map(p=>p.short).join(', ') || 'Trasversali'} ${allies.length ? `• Convergenza: +${allies.map(p=>p.short).join(', ')}` : ''} — ${cand.desc}`}</span>
         `;
         btn.onclick = () => {
-          const snipers = Math.floor(Math.random() * 12) - 4;
-          const actual = Math.max(25, estTotal - snipers);
-          if (actual >= quorum) {
-            electWinner(cand, actual);
-          } else if (ballotNum >= 5) {
-            const bestAI = [...computedCands].sort((a,b) => b.estTotal - a.estTotal)[0];
-            const winTarget = (cand.isPlayer && actual >= 175) ? cand : bestAI.cand;
-            const winVotes = Math.max(quorum + 8, actual, bestAI.estTotal);
-            electWinner(winTarget, winVotes, "(Intesa trasversale raggiunta tra i grandi elettori in Aula)");
+          if (isExtraParliamentary) {
+            addFeed(`📣 <strong>DICHIARAZIONE PUBBLICA:</strong> Da esponente extraparlamentare, ${game.leader.name} rilascia un endorsement pubblico a favore di <strong>${cand.name}</strong> per il Quirinale!`);
+          }
+
+          // Simulazione dello scrutinio segreto dell'intero Parlamento (400 Grandi Elettori)
+          const candidateVotes = {};
+          computedCands.forEach(c => { candidateVotes[c.cand.id] = 0; });
+          let blankVotes = 0;
+
+          // 1. I seggi del giocatore vanno al candidato scelto solo se ha seggi parlamentari
+          if (!isExtraParliamentary && player.seats > 0) {
+            candidateVotes[cand.id] = (candidateVotes[cand.id] || 0) + player.seats;
+          }
+
+          // 2. Convergenza parlamentare progressiva e fine degli scrutini infiniti
+          // Nei ballottaggi 4-6, i partiti convergono rapidamente sui 2 candidati più votati
+          const topTwo = [...computedCands].sort((a,b) => b.estTotal - a.estTotal).slice(0, 2);
+          const topOne = topTwo[0]?.cand;
+          const topTwoCand = topTwo[1]?.cand;
+
+          game.parties.filter(p => p.id !== player.id && p.seats > 0).forEach(p => {
+            const pIdeo = getPartyIdeoScore(p);
+
+            // Nei primi 2 scrutini, tatticismo con schede bianche
+            if (ballotNum <= 2 && Math.random() < 0.25) {
+              blankVotes += p.seats;
+              return;
+            }
+
+            // Dal 4° scrutinio in poi: polarizzazione sui 2 candidati di vertice
+            if (ballotNum >= 4) {
+              const d1 = Math.abs(topOne.idealIdeo - pIdeo);
+              const d2 = topTwoCand ? Math.abs(topTwoCand.idealIdeo - pIdeo) : 999;
+              const chosenTarget = (d1 <= d2) ? topOne : topTwoCand;
+              // Snipers minimi (1-3%)
+              const snipers = Math.round(p.seats * 0.02);
+              blankVotes += snipers;
+              const loyal = Math.max(0, p.seats - snipers);
+              candidateVotes[chosenTarget.id] = (candidateVotes[chosenTarget.id] || 0) + loyal;
+              return;
+            }
+
+            // Scrutini 1-3: voto al candidato più vicino
+            let bestMatch = null, minDist = 999;
+            computedCands.forEach(c => {
+              const dist = Math.abs(c.cand.idealIdeo - pIdeo);
+              if (dist < minDist) { minDist = dist; bestMatch = c.cand; }
+            });
+            const snipers = Math.round(p.seats * 0.05);
+            blankVotes += snipers;
+            const loyalVotes = Math.max(0, p.seats - snipers);
+            if (bestMatch && minDist <= 1.6) {
+              candidateVotes[bestMatch.id] = (candidateVotes[bestMatch.id] || 0) + loyalVotes;
+            } else {
+              blankVotes += loyalVotes;
+            }
+          });
+
+          // PUNTO 6 (1.8.2): Garanzia costituzionale al 5°-6° scrutinio:
+          // Se si è arrivati al 5° scrutinio senza vincitore, scatta l'intesa tra le forze parlamentari sul candidato di garanzia istituzionale
+          if (ballotNum >= 5) {
+            let maxVotes = Math.max(...Object.values(candidateVotes));
+            if (maxVotes < quorum) {
+              const boostNeed = (quorum - maxVotes) + Math.floor(Math.random() * 18) + 6;
+              const bestCandToElect = (cand.isPlayer && (candidateVotes[cand.id] || 0) >= 120) ? cand : (topOne || cand);
+              candidateVotes[bestCandToElect.id] = (candidateVotes[bestCandToElect.id] || 0) + boostNeed;
+              blankVotes = Math.max(0, blankVotes - boostNeed);
+            }
+          }
+
+          // Trova il candidato con il maggior numero di voti in questo scrutinio
+          let topCandObj = null, topVotes = -1;
+          computedCands.forEach(c => {
+            const v = candidateVotes[c.cand.id] || 0;
+            if (v > topVotes) { topVotes = v; topCandObj = c.cand; }
+          });
+
+          // Verifica se il top candidate ha raggiunto il quorum
+          if (topVotes >= quorum && topCandObj) {
+            electWinner(topCandObj, topVotes, `(Eletto a scrutinio segreto superando il quorum di ${quorum} con ${topVotes} voti!)`);
           } else {
-            addFeed(`💨 <strong>Fumata Nera al ${ballotNum}° scrutinio:</strong> ${cand.name} ottiene ${actual} voti su ${quorum}. I capigruppo trattano per il ${ballotNum + 1}° scrutinio!`);
-            openQuirinaleBallotModal(ballotNum + 1);
+            // Fumata Nera!
+            const chosenVotes = candidateVotes[cand.id] || 0;
+            const sortedResults = computedCands
+              .map(c => ({ name: c.cand.name, votes: candidateVotes[c.cand.id] || 0 }))
+              .filter(r => r.votes > 0)
+              .sort((a,b) => b.votes - a.votes);
+
+            const resultsSummary = sortedResults.slice(0, 4)
+              .map(r => `• <strong>${r.name}:</strong> ${r.votes} voti`).join('<br>');
+
+            openModal(
+              `💨 Fumata Nera al ${ballotNum}° Scrutinio (Quorum: ${quorum})`,
+              `<div style="font-size:13px; line-height:1.55; color:var(--text);">
+                Nessun candidato ha raggiunto il quorum richiesto di <strong>${quorum} voti</strong> su 400 Grandi Elettori.<br><br>
+                <strong>Esito dello scrutinio dall'urna di Montecitorio:</strong><br>
+                ${resultsSummary}<br>
+                • <strong>Schede Bianche / Nulle:</strong> ${blankVotes} schede<br><br>
+                ${isExtraParliamentary ? `<em>Hai assistito alle operazioni di spoglio da personalità extraparlamentare.</em>` : (cand.isPlayer ? `Hai ottenuto <strong>${chosenVotes} voti</strong>.` : `Il candidato votato dal tuo gruppo (${cand.name}) ha ottenuto <strong>${chosenVotes} voti</strong>.`)}<br>
+                ${ballotNum === 3 ? `<span style="color:var(--gold-lt); font-weight:800;">🔔 Dal 4° scrutinio il quorum scende alla maggioranza assoluta (201 voti)!</span><br>` : ''}
+                I capigruppo parlamentari sono riconvocati in Aula per il ${ballotNum + 1}° scrutinio.
+              </div>`,
+              [
+                {
+                  label: `🗳️ Procedi al ${ballotNum + 1}° Scrutinio`,
+                  fn: () => {
+                    closeModal();
+                    openQuirinaleBallotModal(ballotNum + 1);
+                  }
+                }
+              ]
+            );
+            addFeed(`💨 <strong>FUMATA NERA AL ${ballotNum}° SCRUTINIO:</strong> Nessun candidato raggiunge il quorum di ${quorum} voti (in testa ${topCandObj?.name || 'dispersi'} con ${topVotes} voti).`);
           }
         };
         box.appendChild(btn);
@@ -1740,11 +2338,11 @@ export function openQuirinaleBallotModal(ballotNum = 1) {
 
       const btnBlank = document.createElement('button');
       btnBlank.className = 'm-btn';
-      btnBlank.innerHTML = `<strong>🏳️ ${isIndependentWithoutSeats ? 'Mantieni Neutralità Istituzionale' : 'Scheda Bianca Tattica'} (${ballotNum >= 4 ? 'I grandi elettori votano il candidato di compromesso' : `Passa al ${ballotNum + 1}° Scrutinio`})</strong>`;
+      btnBlank.innerHTML = `<strong>🏳️ ${isExtraParliamentary ? 'Assisti Neutrale allo Scrutinio' : 'Scheda Bianca Tattica'} (${ballotNum >= 4 ? 'I Grandi Elettori votano il candidato di convergenza' : `Passa al ${ballotNum + 1}° Scrutinio`})</strong>`;
       btnBlank.onclick = () => {
         if (ballotNum >= 4) {
           const bestAI = [...computedCands].filter(x => !x.cand.isPlayer).sort((a,b) => b.estTotal - a.estTotal)[0] || computedCands[0];
-          electWinner(bestAI.cand, Math.max(218, bestAI.estTotal), "(Eletto dal Parlamento dopo la tua neutralità)");
+          electWinner(bestAI.cand, Math.max(218, bestAI.estTotal), "(Eletto dal Parlamento con convergenza istituzionale)");
         } else {
           openQuirinaleBallotModal(ballotNum + 1);
         }
@@ -1753,7 +2351,14 @@ export function openQuirinaleBallotModal(ballotNum = 1) {
       openModal();
     }
 
-export function triggerElections(reason) {
+export function triggerElections(reason, hasVotedCitizen = false) {
+      // PUNTO 11 (1.8.1): Cabina elettorale del cittadino per le Elezioni Politiche della Repubblica
+      if (!hasVotedCitizen && !game.isImprisoned && !game.inExile) {
+        openNationalCitizenVotingBoothModal(reason, (votedParty) => {
+          triggerElections(reason, true);
+        });
+        return;
+      }
       game.lastElectionTurn = game.turn;
       game.legislature = (game.legislature || 19) + 1;
       game.parties.forEach(p => p.seats = 0);
@@ -1902,19 +2507,52 @@ export function triggerElections(reason) {
       openModal();
     }
 
-    /* PUNTO 1: GOVERNO TECNICO DI SALVEZZA NAZIONALE (PREMIERATO TECNICO DI ALTO PROFILO) */
+    /* PUNTO 1 (1.7.1): GOVERNO TECNICO DI SALVEZZA NAZIONALE (ESCLUSIONE RIGOROSA DEL PRESIDENTE DELLA REPUBBLICA E DELLE ALTRE CARICHE) */
 export function formTechnicalGovernment(techId = null, priority = 'stabilità') {
-      const technocrats = POLITICIANS.filter(p => p.partyId === 'tech' && p.age >= 50);
-      const pmCandidate = (techId && technocrats.find(p => p.id === techId))
-        || technocrats.find(p => p.id === 'draghi_p')
-        || technocrats.find(p => p.id === 'panetta_p')
-        || technocrats.find(p => p.id === 'cottarelli_p')
-        || technocrats.find(p => p.id === 'cartabia_p')
-        || technocrats[0];
+      const normName = (s) => String(s || '').replace(/\s*\(Tecnico\)|\s*\(Indip\.\)|\s*\(Bis\)/gi, '').trim().toLowerCase();
+      const presName = normName(game.president?.name);
+      const senName = normName(game.senateSpeaker?.name);
+      const chamName = normName(game.chamberSpeaker?.name);
+      const govNames = new Set(Object.values(game.governors || {}).map(g => normName(g?.name)).filter(Boolean));
+
+      const isUnavailable = (p) => {
+        if (!p) return true;
+        const n = normName(p.name);
+        // PUNTO 14 & 16 (1.8.1): Ex-Presidenti (come Mattarella) e ritirati esclusi tassativamente dal Governo
+        if (game.isRetired && (p.isPlayer || n === normName(game.leader.name))) return true;
+        if (p.id === 'p_mattarella' || p.id === 'mattarella' || n.includes('mattarella') || p.role === 'president' || p.role === 'senatore_a_vita') return true;
+        if (game.pastPresidents && game.pastPresidents.some(past => normName(past) === n)) return true;
+        return n === presName || n === senName || n === chamName || govNames.has(n);
+      };
+
+      const technocrats = POLITICIANS.filter(p => p.partyId === 'tech' && p.age >= 50 && !isUnavailable(p));
+
+      // PUNTO 10 (1.8): Varietà nei Premier Tecnici (15 personalità di altissimo profilo senza ripetersi sempre su Draghi/Panetta)
+      if (!game.pastTechPremiers) game.pastTechPremiers = [];
+      const techPremierPool = [
+        'cartabia_p', 'cottarelli_p', 'colao_p', 'franco_p', 'cingolani_p',
+        'reichlin_p', 'severino_p', 'giovannini_p', 'visco_p', 'cipollone_p',
+        'draghi_p', 'panetta_p', 'cassese_p', 'fornero_p', 'amato_p'
+      ];
+      let pmCandidate = (techId && technocrats.find(p => p.id === techId));
+      if (!pmCandidate) {
+        const unpickedIds = techPremierPool.filter(tid => !game.pastTechPremiers.includes(tid));
+        const poolToSearch = unpickedIds.length > 0 ? unpickedIds : techPremierPool;
+        for (const tid of poolToSearch) {
+          const found = technocrats.find(p => p.id === tid);
+          if (found) { pmCandidate = found; break; }
+        }
+      }
+      if (!pmCandidate) pmCandidate = technocrats[0] || POLITICIANS.find(p => p.partyId === 'tech');
+
+      if (pmCandidate) {
+        game.pastTechPremiers.push(pmCandidate.id);
+        if (game.pastTechPremiers.length > 10) game.pastTechPremiers.shift();
+      }
 
       game.isTechnicalGov = true;
-      game.technocratPM = pmCandidate ? pmCandidate.id : 'draghi_p';
-      const cleanPmName = pmCandidate ? pmCandidate.name : 'Mario Draghi';
+      game.technocratPM = pmCandidate ? pmCandidate.id : 'cartabia_p';
+      const cleanPmName = pmCandidate ? pmCandidate.name : 'Marta Cartabia';
       game.currentPM = `${cleanPmName} (Tecnico)`;
       game.currentGovCoalId = 'none';
       game.govPriority = priority;
@@ -1923,34 +2561,71 @@ export function formTechnicalGovernment(techId = null, priority = 'stabilità') 
       game.gdp = Math.min(3.5, +(game.gdp + 0.25).toFixed(2));
 
       // I partiti moderati e istituzionali danno la fiducia esterna
-      const broadParties = game.parties.filter(p => ['fi','pd','az','iv','pru'].includes(p.id) || p.seats >= 35);
+      const broadParties = game.parties.filter(p => ['fi','pd','azione','iv','piueu','nm'].includes(p.id) || p.seats >= 35);
       game.parties.forEach(p => {
         p.inGov = broadParties.some(bp => bp.id === p.id);
       });
 
-      // Nomina dei ministri con tecnici di assoluto prestigio
-      const techExperts = POLITICIANS.filter(p => p.partyId === 'tech' && (!pmCandidate || p.id !== pmCandidate.id));
-      const used = new Set([pmCandidate ? pmCandidate.id : 'draghi_p']);
+      // Nomina dei 15 ministri con tecnici di assoluto prestigio
+      const used = new Set([pmCandidate ? pmCandidate.id : 'cartabia_p']);
+      const techExperts = POLITICIANS.filter(p => p.partyId === 'tech' && (!pmCandidate || p.id !== pmCandidate.id) && !isUnavailable(p));
       setDraftCabinet({});
-      recordPoliticianHistory(cleanPmName, `Nominato Presidente del Consiglio dei Ministri (Governo Tecnico di Garanzia)`, `Presidente del Consiglio (Tecnico)`);
+      recordPoliticianHistory(cleanPmName, `Presidente del Consiglio dei Ministri (Governo Tecnico)`, `Presidente del Consiglio (Tecnico)`);
       MINISTRIES.forEach(m => {
+        const mClean = m.name.split(' (')[0];
         const expert = techExperts.find(x => !used.has(x.id) && x.pref === m.id)
           || techExperts.find(x => !used.has(x.id))
-          || POLITICIANS.find(x => !used.has(x.id) && x.partyId === 'tech');
+          || POLITICIANS.find(x => !used.has(x.id) && !isUnavailable(x));
         if (expert) {
           game.cabinet[m.id] = expert;
           used.add(expert.id);
-          recordPoliticianHistory(expert.name, `Nominato ${m.name} (Governo Tecnico ${cleanPmName})`, `${m.name}`);
+          recordPoliticianHistory(expert.name, `Ministro ${mClean} (Governo Tecnico)`, `Ministro ${mClean}`);
         }
       });
 
+      // PUNTO 11 (1.8.2): Regole costituzionali rigorose per Presidenti di Senato e Camera durante Governo Tecnico:
+      // - Senato: Art. 58 Costituzione -> età minima 40 anni tassativa!
+      // - No opposizione: solo figure tecniche (partyId === 'tech') o esponenti di partiti che sostengono il governo (inGov === true).
+      // - Figure tecniche di alto profilo istituzionale/giuridico (Cassese, Severino, Flick, ecc.) privilegiate.
+      const isEligibleGovSpeaker = (p, isSenate) => {
+        if (!p || used.has(p.id) || isUnavailable(p)) return false;
+        if (isSenate && (p.age < 40)) return false;
+        if (p.partyId !== 'tech') {
+          const pt = game.parties.find(x => x.id === p.partyId);
+          if (!pt || !pt.inGov) return false;
+        }
+        return true;
+      };
+
+      const techSen = POLITICIANS.filter(p => p.partyId === 'tech' && isEligibleGovSpeaker(p, true));
+      const polSen = POLITICIANS.filter(p => p.partyId !== 'tech' && isEligibleGovSpeaker(p, true));
+      const senateChoice = techSen[0] || polSen[0] || POLITICIANS.find(p => p.partyId === 'tech' && p.age >= 40) || game.senateSpeaker;
+
+      if (senateChoice) {
+        game.senateSpeaker = senateChoice;
+        used.add(senateChoice.id);
+        recordPoliticianHistory(senateChoice.name, `Presidente del Senato della Repubblica (Fase Tecnica)`, `Presidente del Senato`);
+      }
+
+      const techCham = POLITICIANS.filter(p => p.partyId === 'tech' && isEligibleGovSpeaker(p, false));
+      const polCham = POLITICIANS.filter(p => p.partyId !== 'tech' && isEligibleGovSpeaker(p, false));
+      const chamberChoice = techCham[0] || polCham[0] || POLITICIANS.find(p => p.partyId === 'tech' && p.id !== game.senateSpeaker?.id) || game.chamberSpeaker;
+
+      if (chamberChoice) {
+        game.chamberSpeaker = chamberChoice;
+        used.add(chamberChoice.id);
+        recordPoliticianHistory(chamberChoice.name, `Presidente della Camera dei Deputati (Fase Tecnica)`, `Presidente della Camera`);
+      }
+
+      enforceSingleOfficeRule();
+      syncAllPoliticianCareersWithCurrentState();
       addFeed(`🏛️ <strong>GOVERNO TECNICO DEL PRESIDENTE:</strong> Il Quirinale conferisce l'incarico a <strong>${cleanPmName}</strong> per guidare un Esecutivo di alto profilo istituzionale e salvezza nazionale! Lo Spread scende a ${game.spread} pt e la stabilità risale all'84%.`, 'ok');
       setTicker(`GOVERNO TECNICO: Giuramento al Quirinale dell'Esecutivo presieduto da ${cleanPmName}!`);
       closeModal();
       updateAllUI();
     }
 
-    /* PUNTI 2, 12, 16, 17 (v6.2): FORMAZIONE DEL GOVERNO A 15 MINISTERI CON UNICITÀ RIGOROSA DELLE CARICHE E NOMINA DEL GIOCATORE A MINISTRO SE ALLEATO DI COALIZIONE */
+    /* PUNTI 2, 12, 16, 17 (v6.2) & PUNTO 1, 3, 7 (1.7.1): FORMAZIONE DEL GOVERNO A 15 MINISTERI CON UNICITÀ RIGOROSA DELLE CARICHE */
 export function setDraftOfficeSlot(slotKey, polId) {
       const pol = POLITICIANS.find(x => x.id === polId);
       if (!pol) return;
@@ -1980,9 +2655,11 @@ export function generateCencelliDraft(govParties) {
       while (bag.length < numMin) bag.push(sortedG[0]);
 
       const used = new Set();
-      const isForbidden = (x) => !x || used.has(x.id) || x.name === game.president.name || (draftPMName && x.name === draftPMName);
+      const normName = (s) => String(s || '').replace(/\s*\(Tecnico\)|\s*\(Indip\.\)|\s*\(Bis\)/gi, '').trim().toLowerCase();
+      const activeGovNames = new Set(Object.values(game.governors || {}).map(g => normName(g?.name)).filter(Boolean));
+      const isForbidden = (x) => !x || used.has(x.id) || normName(x.name) === normName(game.president?.name) || (draftPMName && normName(x.name) === normName(draftPMName)) || activeGovNames.has(normName(x.name));
 
-      // 1. Assegna prima Presidente del Senato e Presidente della Camera (distinti da Premier, Presidente della Repubblica e Ministri)
+      // 1. Assegna prima Presidente del Senato e Presidente della Camera (distinti da Premier, Presidente della Repubblica, Governatori e Ministri)
       const senParty = sortedG[0];
       const chParty = sortedG[1] || sortedG[0];
       const senCand = POLITICIANS.find(x => !isForbidden(x) && !x.isPlayer && x.partyId === senParty.id)
@@ -1997,9 +2674,10 @@ export function generateCencelliDraft(govParties) {
 
       setDraftCabinet({});
 
-      // 2. Punto 17 v6.2: Se il giocatore fa parte della coalizione di Governo ma NON è il Presidente del Consiglio né il Presidente della Repubblica, il nuovo Premier lo nomina Ministro!
+      // 2. Se il giocatore fa parte della coalizione di Governo ma NON è Presidente della Repubblica, Premier, Presidente di Camera/Senato o Governatore Regionale, riceve un Ministero!
       let playerAssignedMinId = null;
-      if (playerPol && ids.has(game.playerPartyId) && draftPMName !== game.leader.name && !game.president.isPlayer && !game.isImprisoned) {
+      const playerBusyOffice = getPersonCurrentOffice(playerPol, null, true);
+      if (playerPol && ids.has(game.playerPartyId) && !playerBusyOffice && draftPMName !== game.leader.name && !game.president.isPlayer && !game.isImprisoned) {
         const preferredOrder = [playerPol.pref, 'esteri', 'interni', 'mef', 'mimit', 'difesa', 'giustizia', 'cultura', 'mit', 'lavoro', 'mur', 'turismo'];
         const targetM = preferredOrder.find(mId => mId && MINISTRIES.some(m => m.id === mId)) || 'esteri';
         draftCabinet[targetM] = playerPol.id;
@@ -2150,23 +2828,25 @@ export function finalizeManualGovernment() {
       game.govStability = 80;
       game.nextElectionDate = new Date(game.date.getFullYear() + 5, game.date.getMonth(), game.date.getDate());
 
-      recordPoliticianHistory(draftPMName, `Giura al Quirinale come Presidente del Consiglio dei Ministri`, `Presidente del Consiglio`);
+      recordPoliticianHistory(draftPMName, `Presidente del Consiglio dei Ministri`, `Presidente del Consiglio`);
 
       MINISTRIES.forEach(m => {
         const minPol = POLITICIANS.find(x => x.id === draftCabinet[m.id]) || POLITICIANS[0];
+        const mClean = m.name.split(' (')[0];
         game.cabinet[m.id] = minPol;
         if (minPol) {
-          recordPoliticianHistory(minPol.name, `Nominato ${m.name} (Governo ${draftPMName})`, `${m.name}`);
+          recordPoliticianHistory(minPol.name, `Ministro ${mClean}`, `Ministro ${mClean}`);
         }
       });
       game.senateSpeaker = POLITICIANS.find(x => x.id === draftSenateId) || POLITICIANS[0];
       game.chamberSpeaker = POLITICIANS.find(x => x.id === draftChamberId) || POLITICIANS[1];
       if (game.senateSpeaker) {
-        recordPoliticianHistory(game.senateSpeaker.name, `Eletto Presidente del Senato della Repubblica`, `Presidente del Senato`);
+        recordPoliticianHistory(game.senateSpeaker.name, `Presidente del Senato della Repubblica`, `Presidente del Senato`);
       }
       if (game.chamberSpeaker) {
-        recordPoliticianHistory(game.chamberSpeaker.name, `Eletto Presidente della Camera dei Deputati`, `Presidente della Camera`);
+        recordPoliticianHistory(game.chamberSpeaker.name, `Presidente della Camera dei Deputati`, `Presidente della Camera`);
       }
+      enforceSingleOfficeRule();
 
       draftGovParties.forEach(p => {
         const expW = Math.round((p.seats / totS) * totalCencelliWeight);
@@ -2175,6 +2855,30 @@ export function finalizeManualGovernment() {
         if (game.chamberSpeaker?.partyId === p.id) actW += 3;
         game.allySatisfaction[p.id] = Math.max(20, Math.min(100, Math.round(78 + (actW - expW) * 5)));
       });
+
+      // PUNTO 4 (1.8.2): Nomina di 1 o 2 Vicepremier tra i ministri più di spicco dei partiti alleati
+      if (!game.isTechnicalGov) {
+        const pmPartyId = POLITICIANS.find(x => x.name === draftPMName)?.partyId || game.playerPartyId;
+        const alliedGovParties = draftGovParties.filter(p => p.id !== pmPartyId).sort((a,b) => b.seats - a.seats || b.poll - a.poll);
+        const newVPs = [];
+        for (const ap of alliedGovParties) {
+          if (newVPs.length >= 2) break;
+          const leaderPol = POLITICIANS.find(x => x.name === ap.leader && x.partyId === ap.id);
+          const leaderHasMin = leaderPol && Object.values(game.cabinet).some(m => m && m.id === leaderPol.id);
+          if (leaderHasMin) {
+            newVPs.push(leaderPol.id);
+          } else {
+            const apMinisters = Object.values(game.cabinet).filter(m => m && m.partyId === ap.id);
+            if (apMinisters.length > 0) {
+              apMinisters.sort((a,b) => (b.clout || 0) - (a.clout || 0));
+              newVPs.push(apMinisters[0].id);
+            }
+          }
+        }
+        game.vicePremiers = newVPs;
+      } else {
+        game.vicePremiers = [];
+      }
 
       const myMin = getPlayerMinistry();
       addFeed(`🏛️ <strong>GIURAMENTO AL QUIRINALE E FIDUCIA:</strong> Nasce il <strong>Governo ${game.currentPM}</strong>! Eletti <strong>${game.senateSpeaker.name}</strong> Presidente del Senato e <strong>${game.chamberSpeaker.name}</strong> Presidente della Camera.${myMin && game.currentPM !== game.leader.name ? ` <strong>Il Premier ${game.currentPM} ti ha nominato Ministro (${myMin.ministry.name})!</strong>` : ''}`, 'ok');
@@ -2261,46 +2965,8 @@ export function indAction(type) {
       } else if (type === 'found_party') {
         if (game.funds < 80 || game.ap < 35) { alert("Servono € 80k e 35 ⚡ per fondare un nuovo partito nazionale!"); return; }
         if (!useTurnAction('ind_found_party', 'Fondazione Partito')) return;
-        const pName = prompt("Nome del nuovo partito che stai fondando:", "Movimento Civico Italiano");
-        if (!pName) return;
-        const pShort = (prompt("Sigla (max 4 lettere):", "MCI") || "MCI").toUpperCase().slice(0,4);
-        game.funds -= 80; game.ap -= 35;
-        const usedCols = new Set(game.parties.map(p=>p.color));
-        const col = DISTINCT_PALETTE.find(c=>!usedCols.has(c)) || DISTINCT_PALETTE[0];
-        const newId = 'founded_' + game.turn;
-        const rising = generateNewPolitician(newId);
-        const areaStr = getIdeoLabel(game.leader.personalIdeo).replace(/^[^\s]+\s/, '');
-        const newP = {
-          id:newId, name:pName, short:pShort, leader:game.leader.name, leaderAge:game.leader.age, leaderTrust:90, nextCongYear:game.date.getFullYear()+3,
-          personalParty:true, founderLeader:game.leader.name,
-          area:areaStr, coalId:'none', color:col, emblemType:(game.parties.length%6)+1, poll:0.4, initialPoll:0.4, seats:0, inGov:false,
-          credibility:game.leader.prestige, cohesion:92, orgStrength:24, wingLeader:rising.name, wingAge:rising.age, wingName:"Area Civica", wingArea:areaStr,
-          factions:[
-            { name:`Area Fondatrice (${game.leader.name})`, leader:game.leader.name, share:70, desc:"Linea ufficiale del fondatore." },
-            { name:"Area Civica", leader:rising.name, share:30, desc:"Rete territoriale." }
-          ],
-          splitName:`Alternativa ${pShort}`, splitShort:`A${pShort.slice(0,2)}`, bio:`Partito fondato da ${game.leader.name}.`, vetoes:[],
-          stances:{ ...game.personalStances }, baseStances:{ ...game.personalStances }, baseIdeo:game.leader.personalIdeo, lowPollWeeks:0, newlyFoundedGraceWeeks:52
-        };
-        game.parties.push(newP);
-        game.blocSympathy[newId] = {};
-        BLOCS.forEach(b => { game.blocSympathy[newId][b.id] = computeBlocMatch(newP, b) * 0.42; });
-        FALLBACK_REGIONS.forEach(r => { game.regOrg[r.id][newId] = 28; });
-        game.parties.forEach(p => adjPairRel(newId, p.id, 55));
-        game.playerPartyId = newId;
-        game.partyRole = 'secretary';
-        game.selectedDossierPartyId = newId;
-        document.body.classList.remove('theme-ind');
-        const pPol = POLITICIANS.find(x => x.isPlayer || x.name === game.leader.name);
-        if (pPol) {
-          pPol.partyId = newId;
-          if (!game.politicianPartyMap) game.politicianPartyMap = {};
-          game.politicianPartyMap[pPol.id] = newId;
-        }
-        for (let k = 0; k < 4; k++) generateNewPolitician(newId);
-        recordPoliticianHistory(game.leader.name, `Fonda il nuovo partito politico ${pName} (${pShort})`, `Segretario Fondatore ${pShort}`);
-        recalcPolls(true);
-        addFeed(`🏛️ <strong>NUOVA FORZA POLITICA (0.4%):</strong> L'indipendente <strong>${game.leader.name}</strong> fonda da zero <strong>${pName} (${pShort})</strong>! Ora dovrà conquistare consensi sul territorio.`);
+        openCustomPartyCreationModal('found');
+        return;
       } else alert("Risorse insufficienti!");
       updateAllUI();
     }
@@ -2315,6 +2981,18 @@ export function internalPartyAction(mode) {
         if (game.partyRole === 'member') p.leaderTrust = Math.max(25, (p.leaderTrust || 75) - 6);
         addFeed(`🤝 Assemblea nazionale della tua corrente in <strong>${p.short}</strong>: il tuo peso interno sale al <strong>${game.leader.internalSupport}%</strong>!`);
       } else if (mode === 'challenge_congress') {
+        const curY = game.date.getFullYear();
+        const nextCongY = p.nextCongYear || (curY + 2);
+        const turnsSinceLastCong = game.turn - (game.lastCongressTurn || -365);
+        const isCrisis = ((p.leaderTrust || 75) <= 42 || game.leader.internalSupport >= 68);
+        if (curY < nextCongY && !isCrisis) {
+          alert(`⏳ CONGRESSO ORDINARIO NON ANCORA CONVOCABILE (Art. 12 Statuto):\nIl prossimo Congresso Ordinario di ${p.short} è previsto nel ${nextCongY}.\nPer convocare un Congresso Straordinario anticipato serve una grave crisi interna (Fiducia della Segreteria <= 42% o tua Forza Corrente >= 68%)!`);
+          return;
+        }
+        if (turnsSinceLastCong < 180) {
+          alert(`⏳ Hai già celebrato un Congresso di recente in ${p.short}! Devono trascorrere almeno 180 giorni tra due assisi congressuali (ancora ${180 - turnsSinceLastCong} giorni).`);
+          return;
+        }
         if (game.ap < 35) { alert("Servono 35 ⚡ per raccogliere le firme dei delegati e convocare il Congresso!"); return; }
         if (!useTurnAction('party_challenge_congress', 'Convocazione Congresso')) return;
         game.ap -= 35;
@@ -2330,7 +3008,8 @@ export function internalPartyAction(mode) {
         if (game.ap < 40) { alert("Servono 40 ⚡!"); return; }
         if (!useTurnAction('party_split', 'Guida una Scissione')) return;
         game.ap -= 40;
-        executePartySplit(p, true);
+        openCustomPartyCreationModal('split', p);
+        return;
       } else if (mode === 'go_ind') {
         if (!useTurnAction('party_go_ind', 'Uscita dal Partito')) return;
         const oldP = p;
@@ -2618,9 +3297,15 @@ export function campaignReferendumAction(side) {
       if (!useTurnAction('ref_campaign_act', 'Mobilitazione Campagna Referendaria')) return;
       game.ap -= 18;
       game.activeReferendum.ralliesUsed = used + 1;
-      const delta = side === 'yes' ? 3.5 : -3.5;
+
+      // PUNTO 1 (1.8.2): Bilanciamento impatto comizio in proporzione al peso elettorale del partito e carisma del leader
+      const p = getP();
+      const pollShare = (p && p.id !== 'ind' && game.partyRole !== 'independent') ? (p.poll || 2.0) : Math.max(1.0, (game.leader.prestige || 50) * 0.08);
+      // Formula: partito all'1% sposta ~0.5% - 0.7%; partito al 10% sposta ~2.0%; partito al 30% sposta ~5.0% (max 6.0%)
+      const baseShift = Math.max(0.4, Math.min(6.0, +(0.25 + (pollShare * 0.15) + ((game.leader.prestige || 50) * 0.015)).toFixed(1)));
+      const delta = side === 'yes' ? baseShift : -baseShift;
       game.activeReferendum.yesPct = Math.max(10, Math.min(88, +(game.activeReferendum.yesPct + delta).toFixed(1)));
-      addFeed(`📣 <strong>CAMPAGNA REFERENDARIA (${game.activeReferendum.title} — Comizio ${game.activeReferendum.ralliesUsed}/${maxR}):</strong> Mobilitazione di ${game.leader.name} per il <strong>${side === 'yes' ? 'SÌ' : 'NO'}</strong>! I sondaggi sul SÌ si portano al <strong>${game.activeReferendum.yesPct.toFixed(1)}%</strong>.`);
+      addFeed(`📣 <strong>CAMPAGNA REFERENDARIA (${game.activeReferendum.title} — Comizio ${game.activeReferendum.ralliesUsed}/${maxR}):</strong> Mobilitazione di ${game.leader.name} (${p?.short || 'Indipendente'}, ${pollShare.toFixed(1)}% consensi) per il <strong>${side === 'yes' ? 'SÌ' : 'NO'}</strong>! Spostamento opinione pubblica: <strong>${delta > 0 ? '+' : ''}${delta.toFixed(1)}%</strong>. I sondaggi sul SÌ sono ora al <strong>${game.activeReferendum.yesPct.toFixed(1)}%</strong>.`);
       updateAllUI();
     }
 
@@ -2645,6 +3330,11 @@ export function imposeHotLawByDecree(lawId, targetIdx) {
     /* PUNTI 3 & 4 (v6.2.1): COERENZA PROGRAMMATICA OBBLIGATORIA SUI DDL E MORATORIA LEGISLATIVA DI 180 GIORNI */
 export function proposeHotLawParliament(lawId, targetIdx, forceAgainstParty = false) {
       if (game.isImprisoned) { alert("Sei detenuto a Rebibbia!"); return; }
+      // PUNTO 9 (1.8): Il Presidente della Repubblica è garante neutrale e non propone DDL di parte
+      if (game.president.isPlayer && game.stateForm !== 'presidenziale') {
+        alert("❌ PREROGATIVA COSTITUZIONALE (Art. 87 Cost.):\nIn qualità di Presidente della Repubblica rappresenti la Nazione e sei super partes!\nNon puoi presentare DDL di parte in Parlamento; puoi esercitare la Moral Suasion o rinviare le leggi prive di copertura alle Camere (Art. 74 Cost.).");
+        return;
+      }
       const law = HOT_LAWS.find(l => l.id === lawId);
       if (!law) return;
 
@@ -2845,6 +3535,8 @@ export function launchHotLawReferendum(lawId, targetIdx) {
       const leaderBonus = (game.leader.prestige - 55) * 0.14;
       const initYesPct = Math.max(24, Math.min(74, +(weightedSupport / Math.max(1, totalWeight) + leaderBonus).toFixed(1)));
 
+      const curOpt = law.options.find(o => o.idx === (game.lawStates[law.id] ?? law.currentIdx)) || law.options[0];
+      const isGovSponsored = !!(p.inGov || game.currentPM === game.leader.name || getPlayerMinistry());
       game.activeReferendum = {
         kind: 'law',
         lawId: law.id,
@@ -2852,6 +3544,10 @@ export function launchHotLawReferendum(lawId, targetIdx) {
         cooldownKey: law.id,
         title: law.title,
         targetLabel: `${opt.status} (${opt.label})`,
+        currentLabel: `${curOpt.status} (${curOpt.label})`,
+        yesExplanation: `Introduce la riforma: "${opt.status}" — ${opt.label}`,
+        noExplanation: `Mantiene la normativa attuale: "${curOpt.status}" — ${curOpt.label}`,
+        sponsoredByGov: isGovSponsored,
         daysLeft: 30,
         yesPct: initYesPct,
         ralliesUsed: 0,
@@ -3170,6 +3866,16 @@ export function callSpeakerElectionVote(chamberType) {
 
 export function assignMin(minId, polId) {
       if (!polId || game.isImprisoned) return;
+      // PUNTO 2 (1.8.1): Prerogativa esclusiva del Presidente del Consiglio (Art. 92 Cost.)
+      const isPlayerPM = (game.currentPM === game.leader.name || game.currentPM === `${game.leader.name} (Tecnico)`);
+      if (!isPlayerPM) {
+        alert("❌ PREROGATIVA COSTITUZIONALE ESCLUSIVA (Art. 92 Cost.):\nSolo il Presidente del Consiglio dei Ministri può proporre la nomina e il rimpasto dei Ministri dell'Esecutivo!");
+        return;
+      }
+      if (game.isRetired) {
+        alert("❌ MODALITÀ SPETTATORE:\nSei ritirato dalla vita politica attiva e non puoi nominare ministri!");
+        return;
+      }
       if (game.ap < 12) { alert("Servono 12 ⚡ per un rimpasto ministeriale!"); return; }
       const pol = POLITICIANS.find(x => x.id === polId);
       const mInfo = MINISTRIES.find(m => m.id === minId);
@@ -3252,6 +3958,15 @@ export function executeGovDecree(decreeId) {
       dec.run(game);
       recalcPolls(true);
       addFeed(`🏛️ <strong>CONSIGLIO DEI MINISTRI:</strong> Varato il <strong>${dec.title}</strong> su impulso di ${game.leader.name}!`, 'ok');
+      openModal(
+        `🏛️ Decreto-Legge Varato a Palazzo Chigi: ${dec.title}`,
+        `<div style="font-size:13px; color:var(--text); line-height:1.55;">
+          Il Consiglio dei Ministri ha approvato all'unanimità il <strong>${dec.icon} ${dec.title}</strong> su proposta di <strong>${game.leader.name}</strong>.<br><br>
+          ${dec.desc}<br><br>
+          • Il provvedimento è stato pubblicato in Gazzetta Ufficiale ed entra in vigore immediatamente con forza di legge.
+        </div>`,
+        [{ label: "Prendi Atto del Decreto", fn: () => { closeModal(); updateAllUI(); } }]
+      );
       updateAllUI();
     }
 
@@ -3606,6 +4321,17 @@ export function passBudget() {
         game.foreignRels.eu_com = Math.min(100, (game.foreignRels.eu_com || 70) + 6);
         addFeed(`📜 Legge di Bilancio approvata con conti in ordine (Deficit ${game.budget.deficit}%): plauso di mercati e UE (-12 pt Spread).`);
       }
+      // PUNTO 4 (1.8): Modal di esito della Legge di Bilancio
+      openModal(
+        `📜 Approvazione Legge di Bilancio (Deficit: ${game.budget.deficit}%)`,
+        `<div style="font-size:13px; color:var(--text); line-height:1.55;">
+          Il Parlamento ha approvato in via definitiva la <strong>Manovra di Bilancio</strong>.<br><br>
+          • <strong>Deficit Programmato:</strong> <strong>${game.budget.deficit}%</strong> del PIL.<br>
+          • <strong>Reazione dei Mercati:</strong> Spread attestato a <strong>${game.spread} pt</strong> (${game.budget.deficit > 4.0 ? '+16 pt per sforamento parametri' : '-12 pt per rispetto dei conti'}).<br>
+          • <strong>Relazioni con Bruxelles:</strong> Fiducia Commissione UE a <strong>${game.foreignRels.eu_com || 70}/100</strong>.
+        </div>`,
+        [{ label: "Prendi Atto della Manovra", fn: () => { closeModal(); updateAllUI(); } }]
+      );
       recalcPolls(true);
       updateAllUI();
     }
@@ -3617,6 +4343,15 @@ export function govVerifica() {
       game.ap -= 20;
       game.govStability = Math.min(100, game.govStability + 15);
       addFeed(`🤝 Vertice di maggioranza a Palazzo Chigi: rilanciato il patto di coalizione (+15% Stabilità).`);
+      openModal(
+        "🤝 Vertice di Maggioranza — Esito Verifica a Palazzo Chigi",
+        `<div style="font-size:13px; color:var(--text); line-height:1.55;">
+          Si è concluso a tarda notte il vertice di maggioranza a Palazzo Chigi.<br><br>
+          • <strong>Patto di Coalizione Rilanciato:</strong> Superati i nodi programmatici, la <strong>Stabilità dell'Esecutivo risale al ${game.govStability}%</strong> (+15%).<br>
+          • <strong>Clima tra gli Alleati:</strong> Accordo raggiunto su nomine e calendario dei decreti.
+        </div>`,
+        [{ label: "Chiudi Vertice", fn: () => { closeModal(); updateAllUI(); } }]
+      );
       updateAllUI();
     }
 
@@ -3701,6 +4436,10 @@ export function openCrisis() {
 
 export function oppHearing() {
       if (game.isImprisoned) return;
+      if (game.president.isPlayer && game.stateForm !== 'presidenziale') {
+        alert("❌ PREROGATIVA COSTITUZIONALE (Art. 87 Cost.):\nIl Presidente della Repubblica non partecipa al Question Time d'opposizione contro il Governo!");
+        return;
+      }
       const p = getP();
       if (p.seats === 0) {
         alert("❌ NESSUN SEGGIO IN PARLAMENTO:\nNon hai deputati a Montecitorio (0 seggi)!\nIl Question Time e le interrogazioni a risposta immediata sono riservate ai parlamentari eletti.\nUsa i comizi territoriali e i social media per fare opposizione civica.");
@@ -3713,11 +4452,24 @@ export function oppHearing() {
       game.leader.prestige = Math.min(100, game.leader.prestige + 3);
       recalcPolls(true);
       addFeed(`🔍 Question Time di ${game.leader.name} in Aula: l'Esecutivo va in difficoltà (-7% Stabilità Governo).`);
+      openModal(
+        "🔍 Question Time a Montecitorio — Esito Interrogazione a Risposta Immediata",
+        `<div style="font-size:13px; color:var(--text); line-height:1.55;">
+          Hai incalzato i Ministri a Montecitorio durante il Question Time a reti unificate.<br><br>
+          • <strong>Effetto sull'Esecutivo:</strong> I Ministri sono andati in difficoltà sulle risposte, la <strong>Stabilità del Governo cala al ${game.govStability}%</strong> (-7%).<br>
+          • <strong>Tuo Prestigio Personale:</strong> La tua opposizione puntuale è stata apprezzata dai commentatori (+3% Prestigio, attuale: <strong>${game.leader.prestige}%</strong>).
+        </div>`,
+        [{ label: "Chiudi Aula", fn: () => { closeModal(); updateAllUI(); } }]
+      );
       updateAllUI();
     }
 
 export function oppFilibuster() {
       if (game.isImprisoned) return;
+      if (game.president.isPlayer && game.stateForm !== 'presidenziale') {
+        alert("❌ PREROGATIVA COSTITUZIONALE (Art. 87 Cost.):\nIl Presidente della Repubblica non può condurre ostruzionismo parlamentare contro i decreti del Governo!");
+        return;
+      }
       const p = getP();
       if (p.seats === 0) {
         alert("❌ NESSUN SEGGIO IN PARLAMENTO:\nNon hai deputati nelle Commissioni parlamentari (0 seggi)!\nL'ostruzionismo tecnico richiede di depositare sub-emendamenti d'Aula da parte di eletti.");
@@ -3728,6 +4480,14 @@ export function oppFilibuster() {
       game.ap -= 20;
       game.govStability = Math.max(5, game.govStability - 11);
       addFeed(`🧱 Ostruzionismo parlamentare in Commissione: lavori rallentati e fibrillazione nella maggioranza (-11% Stabilità).`);
+      openModal(
+        "🧱 Ostruzionismo Parlamentare — Esito dei Lavori in Commissione",
+        `<div style="font-size:13px; color:var(--text); line-height:1.55;">
+          I tuoi parlamentari hanno depositato centinaia di sub-emendamenti bloccando i lavori delle Commissioni legislative.<br><br>
+          • <strong>Effetto sui Lavori:</strong> Calendarizzazione paralizzata, vertici notturni della maggioranza e <strong>Stabilità del Governo scesa al ${game.govStability}%</strong> (-11%).
+        </div>`,
+        [{ label: "Chiudi Commissione", fn: () => { closeModal(); updateAllUI(); } }]
+      );
       updateAllUI();
     }
 
@@ -3735,6 +4495,12 @@ export function oppFilibuster() {
 export function tableSfiducia() {
       if (game.isImprisoned) return;
       const p = getP();
+
+      // PUNTO 9 (1.8): Il Presidente della Repubblica è garante neutrale super partes (Art. 87 Cost.) e non può sfiduciare il Governo!
+      if (game.president.isPlayer && game.stateForm !== 'presidenziale') {
+        alert("❌ PREROGATIVA COSTITUZIONALE (Art. 87 Cost.):\nIn qualità di Presidente della Repubblica rappresenti l'unità nazionale e sei super partes!\nNon puoi presentare mozioni di sfiducia parlamentari contro il Governo.");
+        return;
+      }
 
       // PUNTO 21 (1.7): Nella Repubblica Presidenziale vige la separazione dei poteri: il Parlamento NON può sfiduciare il Presidente eletto dal popolo!
       if (game.stateForm === 'presidenziale') {
@@ -3846,6 +4612,16 @@ export function tableSfiducia() {
       } else {
         game.govStability = Math.max(10, game.govStability - 10);
         addFeed(`⚖️ Mozione di Sfiducia respinta dalla maggioranza, ma il Governo esce indebolito dal voto (-10% Stabilità).`);
+        // PUNTO 4 (1.8): Modal di riscontro per la mozione di sfiducia respinta
+        openModal(
+          `⚖️ Mozione di Sfiducia Respinta a Montecitorio`,
+          `<div style="font-size:13px; color:var(--text); line-height:1.55;">
+            L'Aula della Camera dei Deputati ha votato sulla <strong>Mozione di Sfiducia al Governo ${game.currentPM}</strong>.<br><br>
+            La maggioranza parlamentare ha fatto quadrato attorno al Presidente del Consiglio. La mozione è stata <strong>respinta</strong>.<br>
+            Tuttavia, lo scontro in Aula ha accentuato le divisioni nella coalizione e la <strong>Stabilità del Governo scende al ${game.govStability}%</strong> (-10%).
+          </div>`,
+          [{ label: "Prendi Atto dell'Esito", fn: () => { closeModal(); updateAllUI(); } }]
+        );
       }
       updateAllUI();
     }
@@ -4084,6 +4860,429 @@ export function investReg(regId, type) {
       updateAllUI();
     }
 
+    /* PUNTO 10 (1.7.1): POLITICA REGIONALE COMPLETA — GOVERNATORI DI REGIONE, RELAZIONI STATO-REGIONI ED ELEZIONI REGIONALI */
+export function checkScheduledRegionalElections() {
+      if (!game.governors) return null;
+      const curY = game.date.getFullYear();
+      const curM = game.date.getMonth() + 1;
+      for (const [regId, gov] of Object.entries(game.governors)) {
+        if (!gov) continue;
+        const nextY = gov.nextElectionYear || 2028;
+        const nextM = gov.nextElectionMonth || 10;
+        // PUNTO 1 (1.8): Solo scadenza naturale a 5 anni o collasso istituzionale della giunta (approval <= 18%)
+        const isExpired = curY > nextY || (curY === nextY && curM >= nextM);
+        const isCrisis = (gov.approval !== undefined && gov.approval <= 18);
+        if (isExpired || isCrisis) {
+          const cdLeft = Math.max(0, (game.regionalElectionCooldowns?.[regId] || 0) - game.turn);
+          if (cdLeft <= 0) return regId;
+        }
+      }
+      return null;
+    }
+
+/* PUNTO 8 (1.8.2): TUTTI I CANDIDATI REGIONALI DISPONIBILI AL VOTO (CDX, CSX, M5S, TERZO POLO, CIVICI/AUTONOMISTI E CANDIDATO DESIGNATO) */
+export function getRegionalCandidatesForElection(regId) {
+      const gov = game.governors?.[regId] || INITIAL_GOVERNORS[regId];
+      const rPolls = game.regionPolls?.[regId] || {};
+      const norm = (s) => String(s || '').replace(/\s*\(Tecnico\)|\s*\(Indip\.\)|\s*\(Bis\)/gi, '').trim().toLowerCase();
+      const incumbentTermLimitReached = (gov && (gov.termsServed || 1) >= 2);
+
+      // Ripartizione partiti nei 5 poli tradizionali regionali italiani
+      const cdxParties = game.parties.filter(p => p.coalId === 'cdx' || ['fdi','lega','fi','nm'].includes(p.id));
+      const csxParties = game.parties.filter(p => p.coalId === 'csx' || ['pd','avs','piueu'].includes(p.id));
+      const m5sParties = game.parties.filter(p => p.id === 'm5s');
+      const thirdParties = game.parties.filter(p => ['azione','iv'].includes(p.id));
+      const altParties = game.parties.filter(p => !cdxParties.includes(p) && !csxParties.includes(p) && !m5sParties.includes(p) && !thirdParties.includes(p));
+
+      const sumPoll = (list) => list.reduce((s, p) => s + (rPolls[p.id] ?? p.poll ?? 1), 0);
+      const cdxBase = Math.max(18, sumPoll(cdxParties));
+      const csxBase = Math.max(16, sumPoll(csxParties));
+      const m5sBase = Math.max(8, sumPoll(m5sParties));
+      const thirdBase = Math.max(6, sumPoll(thirdParties));
+      const altBase = Math.max(4, sumPoll(altParties));
+
+      const isGovCDX = ['cdx','fdi','lega','fi','nm'].includes(String(gov?.partyId || gov?.coalId || '').toLowerCase());
+      const isGovCSX = ['csx','pd','avs','piueu'].includes(String(gov?.partyId || gov?.coalId || '').toLowerCase());
+
+      const pickCand = (partyList, coalLabel, coalColor, defaultFallbackId, isGovMatch) => {
+        // 1. Incumbent ricandidabile
+        if (gov && !incumbentTermLimitReached && isGovMatch) {
+          const incPol = POLITICIANS.find(x => x.id === gov.polId || norm(x.name) === norm(gov.name));
+          if (incPol && !getPersonCurrentOffice(incPol, 'gov:' + regId)) {
+            const isNative = (incPol.region === regId);
+            return { polId: incPol.id, name: incPol.name, partyId: incPol.partyId || gov.partyId, coalId: coalLabel, isIncumbent: true, region: incPol.region, isNative, label: coalLabel, color: coalColor };
+          }
+        }
+        // 2. Candidato custom designato per questo polo
+        if (gov?.customCandidate && (gov.customCandidate.coalId === coalLabel || partyList.some(p => p.id === gov.customCandidate.partyId))) {
+          const cPol = POLITICIANS.find(x => x.id === gov.customCandidate.polId || norm(x.name) === norm(gov.customCandidate.name));
+          const isNative = (cPol?.region === regId);
+          return { ...gov.customCandidate, coalId: coalLabel, isIncumbent: false, region: cPol?.region || regId, isNative, label: coalLabel, color: coalColor };
+        }
+        // 3. Politico reale del roster, con preferenza nativo della regione (Punto 9: 20/20 completato!)
+        const topParty = [...partyList].sort((a,b) => (rPolls[b.id] || b.poll) - (rPolls[a.id] || a.poll))[0] || { id: defaultFallbackId, short: defaultFallbackId.toUpperCase() };
+        const pIds = new Set(partyList.map(p => p.id));
+        const regNativePol = POLITICIANS.find(x => pIds.has(x.partyId) && x.region === regId && !getPersonCurrentOffice(x) && norm(x.name) !== norm(gov?.name));
+        const regPartyPol = POLITICIANS.find(x => x.partyId === topParty.id && !getPersonCurrentOffice(x) && norm(x.name) !== norm(gov?.name));
+        const chosenPol = regNativePol || regPartyPol || POLITICIANS.find(x => pIds.has(x.partyId) && !getPersonCurrentOffice(x)) || POLITICIANS.find(x => x.partyId === topParty.id);
+        const isNative = (chosenPol?.region === regId);
+
+        return {
+          polId: chosenPol ? chosenPol.id : `cand_${topParty.id}_${regId}`,
+          name: chosenPol ? chosenPol.name : `Esponente Regionale ${topParty.short || coalLabel}`,
+          partyId: chosenPol ? chosenPol.partyId : topParty.id,
+          coalId: coalLabel,
+          isIncumbent: false,
+          region: chosenPol?.region || regId,
+          isNative,
+          label: coalLabel,
+          color: coalColor
+        };
+      };
+
+      const cdxCand = pickCand(cdxParties, 'Coalizione Centrodestra', '#2563eb', 'fdi', isGovCDX);
+      const csxCand = pickCand(csxParties, 'Coalizione Centrosinistra', '#ef4444', 'pd', isGovCSX);
+      const m5sCand = pickCand(m5sParties.length ? m5sParties : [{ id: 'm5s', short: 'M5S', poll: 10 }], 'Movimento 5 Stelle', '#eab308', 'm5s', gov?.partyId === 'm5s');
+      const thirdCand = pickCand(thirdParties.length ? thirdParties : [{ id: 'azione', short: 'Azione', poll: 4 }], 'Polo Moderato & Riformista', '#06b6d4', 'azione', ['azione','iv'].includes(gov?.partyId));
+      const altCand = pickCand(altParties.length ? altParties : [{ id: 'dsp', short: 'Civica Territoriale', poll: 2 }], 'Polo Civico & Territoriale', '#8b5cf6', 'dsp', false);
+
+      const list = [
+        { ...cdxCand, baseShare: cdxBase + (cdxCand.isNative ? 4.5 : 0) },
+        { ...csxCand, baseShare: csxBase + (csxCand.isNative ? 4.5 : 0) },
+        { ...m5sCand, baseShare: m5sBase + (m5sCand.isNative ? 4.5 : 0) },
+        { ...thirdCand, baseShare: thirdBase + (thirdCand.isNative ? 4.5 : 0) },
+        { ...altCand, baseShare: altBase + (altCand.isNative ? 4.5 : 0) }
+      ];
+
+      // Se il giocatore ha designato un custom candidate e non è ancora incluso nella lista
+      if (gov?.customCandidate && !list.some(c => c.polId === gov.customCandidate.polId || norm(c.name) === norm(gov.customCandidate.name))) {
+        const cPol = POLITICIANS.find(x => x.id === gov.customCandidate.polId || norm(x.name) === norm(gov.customCandidate.name));
+        const isNative = (cPol?.region === regId);
+        const pt = game.parties.find(x => x.id === gov.customCandidate.partyId);
+        list.push({
+          polId: gov.customCandidate.polId,
+          name: gov.customCandidate.name,
+          partyId: gov.customCandidate.partyId || 'ind',
+          coalId: gov.customCandidate.coalId || 'LISTA_PROPRIA',
+          label: `Candidato Ufficiale ${pt ? pt.short : 'Indipendente'}`,
+          isIncumbent: false,
+          region: cPol?.region || regId,
+          isNative,
+          color: pt?.color || '#10b981',
+          baseShare: Math.max(10, ((rPolls[pt?.id] || pt?.poll || 5) * 1.5) + (isNative ? 4.5 : 0))
+        });
+      }
+
+      return list;
+    }
+
+export function openRegionalElectionModal(regId, isEarly = false) {
+      const gov = game.governors?.[regId] || INITIAL_GOVERNORS[regId];
+      if (!gov) return;
+      const cands = getRegionalCandidatesForElection(regId);
+      const totalBase = cands.reduce((s, c) => s + c.baseShare, 0) || 100;
+      const p = getP();
+
+      const isPlayerRunning = cands.some(c => c.name === game.leader.name || c.polId === 'player_leader_pol');
+      const isIndNonRunning = (game.partyRole === 'independent' || p.id === 'ind') && !isPlayerRunning;
+
+      document.getElementById('mTag').textContent = `ELEZIONI REGIONALI IN ${regId.toUpperCase()} • LEGGE TATARELLA (TURNO UNICO)`;
+      document.getElementById('mTitle').textContent = `🗳️ Urne Aperte per la Presidenza della Regione ${regId}`;
+      document.getElementById('mBody').innerHTML = `
+        <div style="font-size:13px; line-height:1.55; color:var(--text);">
+          I cittadini di <strong>${regId}</strong> sono chiamati alle urne per eleggere a <strong>turno unico</strong> il <strong>Presidente della Giunta Regionale (Governatore)</strong> e il Consiglio Regionale (Premio di Maggioranza al 55-60% dei seggi).<br>
+          • <strong>Governatore Uscente:</strong> <strong>${gov.name}</strong> (${(game.parties.find(x=>x.id===gov.partyId)?.short)||gov.partyId.toUpperCase()} — Mandati svolti: <strong>${gov.termsServed || 1}/2</strong> — Gradimento: <strong>${gov.approval}%</strong>)<br>
+          ${(gov.termsServed || 1) >= 2 ? `<span style="color:#f87171; font-weight:800;">🔒 Limite dei 2 mandati consecutivi raggiunto (L. 165/2004): l'uscente non è ricandidabile.</span><br>` : ''}
+          <div style="margin:12px 0; display:grid; grid-template-columns:repeat(${cands.length},1fr); gap:8px;">
+            ${cands.map(c => {
+              const estPct = ((c.baseShare / totalBase) * 100).toFixed(1);
+              const pt = game.parties.find(x => x.id === c.partyId);
+              return `<div class="box" style="margin:0; padding:10px; border-top:3px solid ${c.color};">
+                <div style="font-size:10px; text-transform:uppercase; font-weight:800; color:${c.color};">${c.label}</div>
+                <div style="font-size:14px; font-weight:900; margin:4px 0;">${c.name} ${c.isIncumbent ? '👑' : ''}</div>
+                <div style="font-size:11px; color:var(--muted);">Partito: <strong style="color:${pt?.color||'#fff'};">${pt?.short||c.partyId.toUpperCase()}</strong></div>
+                ${c.isNative ? `<div style="font-size:10px; color:#34d399; font-weight:800;">🏡 Radicato in ${regId} (+4.5%)</div>` : ''}
+                <div style="font-size:15px; font-weight:900; color:var(--gold-lt); margin-top:4px;">~${estPct}%</div>
+              </div>`;
+            }).join('')}
+          </div>
+          ${isIndNonRunning 
+            ? `In qualità di personalità Indipendente fuori dai partiti, osservi l'esito della consultazione elettorale in <strong>${regId}</strong>:` 
+            : `Quale strategia elettorale adotti prima dello scrutinio regionale in <strong>${regId}</strong>?`}
+        </div>
+      `;
+
+      const box = document.getElementById('mChoices');
+      box.innerHTML = '';
+
+      // PUNTO 21 (1.8): Opzioni adeguate per Indipendenti senza comizi partitici
+      const strategies = isIndNonRunning ? [
+        { l: `🔍 Segui i comizi e analizza i dossier di ${regId} (10 ⚡)`, d: `Approfondisci i temi del territorio (+4% tuo Prestigio Personale)`, costAP: 10, costFunds: 0, boost: 0, prestigeGain: 4 },
+        { l: `📢 Rilascia una dichiarazione neutrale da osservatore civico (8 ⚡)`, d: `Richiamo alla serietà istituzionale (+3% Prestigio)`, costAP: 8, costFunds: 0, boost: 0, prestigeGain: 3 },
+        { l: `🗳️ Procedi direttamente allo scrutinio delle schede (0 ⚡)`, d: `Prendi atto dell'esito del voto popolare dei cittadini`, costAP: 0, costFunds: 0, boost: 0 }
+      ] : [
+        { l: `🔥 Blitz Finale del Leader in ${regId} (15 ⚡, € 20k)`, d: `Mobilitazione straordinaria nei capoluoghi (+3.8% al candidato della tua area)`, costAP: 15, costFunds: 20, boost: 3.8 },
+        { l: `🤝 Patto con Sindaci, Civiche e Imprese (18 ⚡)`, d: `Rafforza il voto disgiunto (+2.8% voti e +3 Radicamento in ${regId})`, costAP: 18, costFunds: 0, boost: 2.8, orgGain: 3 },
+        { l: `🗳️ Procedi allo scrutinio delle schede regionali (0 ⚡)`, d: `Affidati ai rapporti di forza sul territorio`, costAP: 0, costFunds: 0, boost: 0 }
+      ];
+
+      strategies.forEach(st => {
+        const btn = document.createElement('button');
+        btn.className = 'm-btn';
+        btn.innerHTML = `<strong>${st.l}</strong><span>${st.d}</span>`;
+        btn.onclick = () => {
+          if (game.ap < st.costAP || game.funds < st.costFunds) {
+            alert(`Risorse insufficienti! Servono ${st.costAP} ⚡ e € ${st.costFunds}k.`);
+            return;
+          }
+          game.ap -= st.costAP;
+          game.funds -= st.costFunds;
+          if (st.prestigeGain) game.leader.prestige = Math.min(100, game.leader.prestige + st.prestigeGain);
+          if (st.orgGain && game.regOrg[regId] && p.id !== 'ind') {
+            game.regOrg[regId][game.playerPartyId] = Math.min(100, (game.regOrg[regId][game.playerPartyId] || 50) + st.orgGain);
+          }
+          runRegionalElectionVote(regId, cands, st.boost);
+        };
+        box.appendChild(btn);
+      });
+
+      openModal();
+    }
+
+export function runRegionalElectionVote(regId, cands = null, playerBoost = 0, hasVotedCitizen = false) {
+      if (!Array.isArray(cands)) cands = getRegionalCandidatesForElection(regId);
+      // PUNTO 11 (1.8.1): Se il giocatore è residente in questa regione, entra prima in cabina elettorale come comune cittadino
+      const isPlayerResident = (game.leader.region === regId);
+      if (isPlayerResident && !hasVotedCitizen && !game.isImprisoned && !game.inExile) {
+        openRegionalCitizenVotingBoothModal(regId, cands, (votedCand) => {
+          runRegionalElectionVote(regId, cands, playerBoost + 0.1, true);
+        });
+        return;
+      }
+      const gov = game.governors?.[regId] || INITIAL_GOVERNORS[regId];
+      const p = getP();
+      const myCoal = String(p.coalId || '').toLowerCase() === 'cdx' ? 'CDX' : (String(p.coalId || '').toLowerCase() === 'csx' ? 'CSX' : 'TERZO');
+
+      let sum = 0;
+      const scored = cands.map(c => {
+        let s = c.baseShare + (Math.random() * 3.2 - 1.6);
+        if (c.isIncumbent && (gov?.approval || 55) >= 56) s += 2.4;
+        if (String(c.coalId).toUpperCase() === myCoal || c.partyId === game.playerPartyId) s += playerBoost;
+        s = Math.max(2.5, s);
+        sum += s;
+        return { ...c, rawScore: s };
+      });
+
+      scored.forEach(c => {
+        c.finalPct = +((c.rawScore / (sum || 1)) * 100).toFixed(1);
+      });
+      scored.sort((a,b) => b.finalPct - a.finalPct);
+      const winner = scored[0];
+      const runnerUp = scored[1] || scored[0];
+      const curYear = game.date.getFullYear();
+      const curMonth = game.date.getMonth() + 1;
+
+      const oldGovName = gov?.name;
+      const wPol = POLITICIANS.find(x => x.id === winner.polId || x.name === winner.name);
+      const isReelected = (oldGovName && oldGovName === winner.name);
+      const newTermsServed = isReelected ? ((gov?.termsServed || 1) + 1) : 1;
+
+      game.governors[regId] = {
+        regId,
+        polId: winner.polId,
+        name: winner.name,
+        age: wPol?.age || gov?.age || 54,
+        partyId: winner.partyId,
+        coalId: String(winner.coalId || 'CDX').toUpperCase(),
+        approval: 62,
+        termsServed: newTermsServed,
+        majorityPct: winner.finalPct,
+        sinceYear: isReelected ? (gov.sinceYear || curYear - 5) : curYear,
+        termStartYear: curYear,
+        nextElectionYear: curYear + 5,
+        nextElectionMonth: curMonth,
+        isPlayer: (winner.name === game.leader.name || winner.polId === 'player_leader_pol')
+      };
+
+      recordPoliticianHistory(winner.name, `Presidente della Regione ${regId} (${newTermsServed}° Mandato)`, `Presidente della Regione ${regId}`);
+      enforceSingleOfficeRule();
+      syncAllPoliticianCareersWithCurrentState();
+      const winParty = game.parties.find(x => x.id === winner.partyId);
+
+      addFeed(`🏛️ <strong>ELEZIONI REGIONALI ${regId.toUpperCase()}:</strong> <strong>${winner.name}</strong> (${winParty ? winParty.short : winner.partyId.toUpperCase()}, ${winner.label}) è eletto <strong>Presidente della Regione ${regId}</strong> col <strong>${winner.finalPct}%</strong> contro ${runnerUp.name} (${runnerUp.finalPct}%)!`, 'ok');
+      setTicker(`REGIONALI ${regId.toUpperCase()}: Vince ${winner.name} (${winner.finalPct}%) eletto Governatore!`);
+
+      document.getElementById('mTag').textContent = `SCRUTINIO DEFINITIVO VIMINALE • REGIONE ${regId.toUpperCase()}`;
+      document.getElementById('mTitle').textContent = `👑 ${winner.name} eletto Presidente della Regione ${regId} (${winner.finalPct}%)`;
+      document.getElementById('mBody').innerHTML = `
+        <div style="font-size:13px; line-height:1.55;">
+          Lo spoglio delle sezioni elettorali in <strong>${regId}</strong> è concluso. Grazie al premio di maggioranza regionale, la coalizione vincente ottiene il <strong>60% dei seggi nel Consiglio Regionale</strong>.<br>
+          ${oldGovName && oldGovName !== winner.name ? `<div style="margin-top:6px; color:#fbbf24; font-weight:800;">⚡ RIBALTONE IN GIUNTA: ${winner.name} subentra all'uscente ${oldGovName}!</div>` : `<div style="margin-top:6px; color:#34d399; font-weight:800;">✅ CONFERMA IN GIUNTA: ${winner.name} guida la Regione per il quinquennio ${curYear}–${curYear+5}.</div>`}
+          <div style="margin-top:12px; display:flex; flex-direction:column; gap:8px;">
+            ${scored.map((c, idx) => {
+              const pt = game.parties.find(x => x.id === c.partyId);
+              return `<div style="background:var(--bg-2); border:1px solid ${idx===0?'var(--gold-bd)':'var(--border)'}; border-radius:8px; padding:10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                  <strong>${idx===0?'🏆 ':''}${c.name} <span style="font-size:11px; color:${pt?.color||'#94a3b8'};">(${pt?.short||c.partyId.toUpperCase()} — ${c.label})</span></strong>
+                  <span style="font-size:15px; font-weight:900; color:${idx===0?'#34d399':'var(--text)'};">${c.finalPct}%</span>
+                </div>
+                <div style="height:7px; background:#0f172a; border-radius:4px; overflow:hidden;">
+                  <div style="height:100%; width:${c.finalPct}%; background:${c.color};"></div>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
+      `;
+      const box = document.getElementById('mChoices');
+      box.innerHTML = '';
+      const okBtn = document.createElement('button');
+      okBtn.className = 'btn-gold';
+      okBtn.innerHTML = (winner.name === game.leader.name)
+        ? `🏛️ Insedia la Nuova Giunta Regionale di ${regId} →`
+        : `🏛️ Prendi atto dell'esito elettorale e insedia la Giunta →`;
+      okBtn.onclick = () => { closeModal(); updateAllUI(); };
+      box.appendChild(okBtn);
+    }
+
+export function regionalGovAction(regId, mode) {
+      if (game.isImprisoned) return;
+      const gov = game.governors?.[regId] || INITIAL_GOVERNORS[regId];
+      if (!gov) return;
+      const p = getP();
+
+      if (mode === 'pact') {
+        if (game.ap < 16) { alert("Servono 16 ⚡ per siglare un Patto Istituzionale col Governatore!"); return; }
+        if (!useTurnAction(`reg_pact_${regId}`, `Patto Istituzionale in ${regId}`)) return;
+        game.ap -= 16;
+        gov.approval = Math.min(88, (gov.approval || 55) + 5);
+        if (!game.regOrg[regId]) game.regOrg[regId] = {};
+        game.regOrg[regId][game.playerPartyId] = Math.min(100, (game.regOrg[regId][game.playerPartyId] || 50) + 3);
+        game.govStability = Math.min(100, game.govStability + 2);
+        addFeed(`🤝 <strong>INTESA STATO-REGIONE IN ${regId.toUpperCase()}:</strong> Accordo su sanità e infrastrutture col Governatore <strong>${gov.name}</strong> (+5% Gradimento Governatore, +3 Radicamento in ${regId}).`, 'ok');
+      } else if (mode === 'challenge_gov') {
+        if (game.ap < 18) { alert("Servono 18 ⚡ per lanciare un'offensiva politica contro la Giunta Regionale!"); return; }
+        if (!useTurnAction(`reg_chal_${regId}`, `Inchiesta Politica sulla Giunta ${regId}`)) return;
+        game.ap -= 18;
+        gov.approval = Math.max(18, (gov.approval || 55) - 7);
+        if (!game.regOrg[regId]) game.regOrg[regId] = {};
+        game.regOrg[regId][game.playerPartyId] = Math.min(100, (game.regOrg[regId][game.playerPartyId] || 50) + 3);
+        addFeed(`⚡ <strong>ATTACCO ALLA GIUNTA REGIONALE (${regId.toUpperCase()}):</strong> ${game.leader.name} denuncia liste d'attesa e bilanci della Giunta di <strong>${gov.name}</strong> (-7% Gradimento Governatore, +3 Radicamento in ${regId})!`, 'cr');
+      } else if (mode === 'propose_cand') {
+        proposeRegionalCandidateModal(regId);
+        return;
+      }
+      recalcPolls(true);
+      updateAllUI();
+    }
+
+export function proposeRegionalCandidateModal(regId) {
+      if (game.isRetired) {
+        alert("❌ MODALITÀ SPETTATORE:\nSei ritirato dalla vita politica attiva e non puoi proporre candidature!");
+        return;
+      }
+      const gov = game.governors?.[regId] || INITIAL_GOVERNORS[regId];
+      const p = getP();
+      const isInd = (game.partyRole === 'independent' || p.id === 'ind');
+      const myCoal = isInd ? 'INDIPENDENTE' : (p.coalId === 'cdx' ? 'cdx' : (p.coalId === 'csx' ? 'csx' : 'pld_c'));
+
+      // PUNTO 1 (1.8.1): Se si gioca come membro (non Segretario), la scelta è prerogativa del Segretario!
+      // Il membro può solo proporre la PROPRIA candidatura al Segretario!
+      if (!isInd && game.partyRole === 'member') {
+        const secName = p.leader;
+        const isNative = (game.leader.region === regId);
+        document.getElementById('mTag').textContent = `TAVOLO ELETTORALE • PROPOSTA CANDIDATURA IN ${regId.toUpperCase()}`;
+        document.getElementById('mTitle').textContent = `🙋 Proponiti come Candidato Governatore in ${regId}`;
+        document.getElementById('mBody').innerHTML = `
+          <div style="font-size:13px; line-height:1.55; color:var(--text);">
+            In qualità di <strong>semplice membro di partito</strong> in <strong>${p.name}</strong>, la designazione ufficiale dei candidati spetta statutariamente al <strong>Segretario Nazionale ${secName}</strong>.<br><br>
+            Puoi avanzare la <strong>richiesta di candidatura personale</strong> alla segreteria per guidare la coalizione alle prossime <strong>Elezioni Regionali in ${regId}</strong>.<br>
+            • Tuo Radicamento: <strong>${isNative ? `🏡 Nativo di ${regId} (+Bonus Radicamento +4.5% alle Urne)` : `Fuori regione (residente in ${game.leader.region})`}</strong><br>
+            • Tuo Prestigio: <strong>${game.leader.prestige}%</strong> • Sostegno Interno: <strong>${game.leader.internalSupport}%</strong><br><br>
+            Il Segretario <strong>${secName}</strong> valuterà se accogliere la tua autocandidatura.
+          </div>
+        `;
+        const box = document.getElementById('mChoices');
+        box.innerHTML = '';
+
+        const btnProp = document.createElement('button');
+        btnProp.className = 'm-btn';
+        btnProp.innerHTML = `<strong>🙋 Chiedi l'Accettazione della Candidatura al Segretario ${secName}</strong><span>Sottoponi il tuo profilo alla Segreteria Nazionale per correre in ${regId}</span>`;
+        btnProp.onclick = () => {
+          const score = (isNative ? 40 : 12) + (game.leader.prestige * 0.35) + (game.leader.internalSupport * 0.35);
+          const accepted = score >= 50 || Math.random() * 100 < score;
+          if (accepted) {
+            if (!game.governors[regId]) game.governors[regId] = { ...INITIAL_GOVERNORS[regId] };
+            game.governors[regId].customCandidate = { polId: 'player_leader_pol', name: game.leader.name, partyId: p.id, coalId: myCoal };
+            recordPoliticianHistory(game.leader.name, `Designato candidato ufficiale alla Presidenza della Regione ${regId} dalla Segreteria di ${p.short}`, 'Candidato Governatore');
+            addFeed(`🏆 <strong>CANDIDATURA ACCOLTA!</strong> Il Segretario <strong>${secName}</strong> (${p.short}) accoglie la tua richiesta e ti candida ufficialmente a <strong>Governatore della Regione ${regId}</strong>!`, 'ok');
+            setTicker(`REGIONALI ${regId.toUpperCase()}: ${game.leader.name} candidato Governatore per ${p.short}!`);
+          } else {
+            addFeed(`✋ <strong>CANDIDATURA RESPINTA:</strong> Il Segretario ${secName} ha respinto la tua autocandidatura per la Regione ${regId}: 'Il partito punta su dirigenti con altro profilo territoriale'.`);
+            alert(`Il Segretario ${secName} ha respinto la tua candidatura per la Regione ${regId}.\nMotivazione: Prestigio o radicamento territoriale insufficiente secondo la segreteria.`);
+          }
+          closeModal();
+          updateAllUI();
+        };
+        box.appendChild(btnProp);
+
+        const btnBack = document.createElement('button');
+        btnBack.className = 'm-btn';
+        btnBack.innerHTML = `<strong>Rinuncia</strong><span>Non avanzare richieste di candidatura per ${regId}</span>`;
+        btnBack.onclick = closeModal;
+        box.appendChild(btnBack);
+        openModal();
+        return;
+      }
+
+      // PUNTO 6 (1.8.1): Se sei Segretario Nazionale:
+      // - Candidabili SOLO membri del PROPRIO partito (NON di altri partiti della coalizione!)
+      // - In nessun caso può essere candidato un Segretario di Partito (inclusi te stesso o segretari di altri partiti)!
+      const allPartySecNames = new Set((game.parties || []).map(pt => pt.leader.toLowerCase().trim()));
+      const candidates = isInd
+        ? [ensurePlayerInPoliticians(), ...POLITICIANS.filter(pol => pol.partyId === 'tech' && pol.region === regId)]
+        : POLITICIANS.filter(pol => {
+            if (pol.partyId !== p.id) return false;
+            const pNameLower = pol.name.toLowerCase().trim();
+            if (allPartySecNames.has(pNameLower)) return false;
+            if (pol.name === p.leader) return false;
+            const off = getPersonCurrentOffice(pol);
+            return (!off || off === `Presidente della Regione ${regId}`);
+          });
+
+      document.getElementById('mTag').textContent = `TAVOLO ELETTORALE • CANDIDATURA REGIONE ${regId.toUpperCase()}`;
+      document.getElementById('mTitle').textContent = `🏛️ Designa il Candidato Governatore per ${p.short} in ${regId}`;
+      document.getElementById('mBody').innerHTML = `
+        <div style="font-size:13px; line-height:1.5;">
+          In qualità di <strong>Segretario Nazionale di ${p.name}</strong>, scegli il candidato ufficiale del tuo partito per le prossime <strong>Elezioni Regionali in ${regId}</strong> (scadenza naturale: <strong>${gov?.nextElectionYear || 2028}</strong>).<br>
+          • <strong>Regola Costituzionale:</strong> I candidati possono appartenere esclusivamente al tuo partito (<strong>${p.short}</strong>). I Segretari Nazionali di partito non possono candidarsi a Governatore.<br>
+          • <em>I dirigenti nativi di ${regId} godono del <strong>Bonus Radicamento Nativo (+4.5%)</strong> alle urne!</em>
+        </div>
+      `;
+      const box = document.getElementById('mChoices');
+      box.innerHTML = '';
+      if (candidates.length === 0) {
+        box.innerHTML = `<div style="padding:10px; color:var(--muted);">Nessun quadro di ${p.short} eleggibile disponibile (i segretari nazionali non possono correre per la Regione).</div>`;
+      } else {
+        candidates.slice(0, 10).forEach(cand => {
+          const isNative = (cand.region === regId);
+          const btn = document.createElement('button');
+          btn.className = 'm-btn';
+          btn.innerHTML = `<strong>👤 ${cand.name} (${p.short}) ${isNative ? '🏡 [Radicato in ' + regId + ' +4.5%]' : ''}</strong><span>Competenza: ${cand.comp || 82} • Prestigio: ${cand.clout || 82} • ${cand.role || 'Quadro Regionale'}</span>`;
+          btn.onclick = () => {
+            if (!game.governors[regId]) game.governors[regId] = { ...INITIAL_GOVERNORS[regId] };
+            game.governors[regId].customCandidate = { polId: cand.id, name: cand.name, partyId: p.id, coalId: myCoal };
+            recordPoliticianHistory(cand.name, `Designato candidato ufficiale del partito alla Presidenza della Regione ${regId}`, 'Candidato Governatore');
+            addFeed(`🗳️ <strong>CANDIDATURA IN ${regId.toUpperCase()}:</strong> <strong>${cand.name}</strong> è il candidato ufficiale di <strong>${p.short}</strong> alla Presidenza della Regione ${regId}!`, 'ok');
+            closeModal();
+            updateAllUI();
+          };
+          box.appendChild(btn);
+        });
+      }
+      openModal();
+    }
+
     // =========================================================================
     // TAB 10: EMICICLO MONTECITORIO (SINISTRA A SINISTRA, DESTRA A DESTRA) & QUIRINALE
     // =========================================================================
@@ -4188,3 +5387,340 @@ export function exileAction(mode) {
 
     // =========================================================================
 
+// =========================================================================
+// HELPER METHODS PER VERIFICA E REGOLAZIONE REGOLE 1.8
+// =========================================================================
+
+export function isEligibleForPremier(name) {
+  if (name === game.leader.name && (game.premierTermsServed || 1) >= 2 && game.currentPM === name) {
+    return false;
+  }
+  return true;
+}
+
+export function isEligibleForPresident(name) {
+  if (name === game.president.name && (game.presTermsServed || 1) >= 2) {
+    return false;
+  }
+  return true;
+}
+
+export function isCandidateEligibleForGovernorship(name, regId) {
+  const gov = game.governors?.[regId] || INITIAL_GOVERNORS[regId];
+  if (gov && (gov.name === name || gov.polId === name) && (gov.termsServed || 1) >= 2) {
+    return false;
+  }
+  return true;
+}
+
+export function getQuirinaleQuorum(ballotNum) {
+  return ballotNum <= 3 ? 267 : 201;
+}
+
+export function calculateRegionalCandidateBonus(candidate, regId) {
+  return (candidate && candidate.region === regId) ? 4.5 : 0;
+}
+
+export function buildReferendumQuestionText(law, targetIdx) {
+  const opt = law?.options?.find(o => o.idx === targetIdx) || law?.options?.[0] || { status: 'Riforma', label: 'Nuova norma' };
+  const curIdx = game.lawStates[law?.id] ?? law?.currentIdx ?? 0;
+  const curOpt = law?.options?.find(o => o.idx === curIdx) || law?.options?.[0] || { status: 'Vigente', label: 'Norma in vigore' };
+  return {
+    yesMeaning: `Introduce la riforma: "${opt.status}" — ${opt.label}`,
+    noMeaning: `Mantiene la normativa attuale: "${curOpt.status}" — ${curOpt.label}`
+  };
+}
+
+export function applyReferendumDefeatShock() {
+  game.govStability = Math.max(0, game.govStability - 18);
+  game.spread = Math.min(450, game.spread + 9);
+}
+
+export function calcRevoltRisk() {
+  const p = getP();
+  const outlawedCount = game.outlawedParties ? game.outlawedParties.length : 0;
+  if (game.isDictatorship) {
+    const baseRevolt = outlawedCount * 6.5 + (100 - (p?.poll || 20)) * 0.25;
+    return Math.max(game.revoltRisk || 0, Math.min(100, Math.round(baseRevolt)));
+  }
+  return game.revoltRisk || 0;
+}
+
+export function challengeLeadershipInternal() {
+  const p = getP();
+  if (!p || p.id === 'ind') return { won: false, reason: 'Non appartieni a un partito strutturato.' };
+  const turnsSinceLastCong = game.turn - (game.lastCongressTurn || -365);
+  if (turnsSinceLastCong < 52) {
+    return { won: false, reason: 'Congresso celebrato di recente: cooldown di 52 settimane / 1 anno attivo.' };
+  }
+  const incumbentTrust = p.leaderTrust || 75;
+  const isEntrenched = ['Matteo Salvini', 'Giorgia Meloni', 'Giuseppe Conte', 'Elly Schlein'].includes(p.leader);
+  const incumbentPower = incumbentTrust + (isEntrenched ? 35 : 15);
+  const challengerPower = (game.leader.internalSupport || 50) * 0.65 + (game.leader.prestige || 50) * 0.35;
+  const won = challengerPower > incumbentPower;
+  return { won, challengerPower, incumbentPower, reason: won ? 'Mozione vincente.' : 'Mozione respinta dai delegati.' };
+}
+
+export function triggerAiPoliticianDefection() {
+  const eligibleParties = game.parties.filter(p => p.id !== 'ind' && p.seats >= 0);
+  if (eligibleParties.length < 2) return false;
+
+  // Scegli un partito di provenienza in crisi di coesione o calo consensi
+  const fromParties = eligibleParties.filter(p => (p.cohesion || 75) <= 65 || p.poll < (p.initialPoll || p.poll));
+  const fromParty = fromParties.length > 0 ? fromParties[Math.floor(Math.random() * fromParties.length)] : eligibleParties[Math.floor(Math.random() * eligibleParties.length)];
+
+  const fromPols = POLITICIANS.filter(p => p.partyId === fromParty.id && !p.isPlayer && !getPersonCurrentOffice(p));
+  if (fromPols.length === 0) return false;
+
+  const pol = fromPols[Math.floor(Math.random() * fromPols.length)];
+  const polIdeo = pol.compass?.ideoScore ?? getPartyIdeoScore(fromParty);
+
+  // Trova partiti di destinazione compatibili per distanza ideologica (<= 0.8 pt) ed esclusione estremi opposti
+  const compatibleDestParties = eligibleParties.filter(dest => {
+    if (dest.id === fromParty.id) return false;
+    const destIdeo = getPartyIdeoScore(dest);
+    if (Math.abs(destIdeo - polIdeo) > 0.8) return false;
+    // PUNTI 5 & 10 (1.8.1): Esclusione categorica tra estremi opposti (CasaPound/FN non possono andare a Sinistra/Comunisti e viceversa)
+    if (polIdeo >= 3.2 && destIdeo <= 2.2) return false;
+    if (polIdeo <= 0.8 && destIdeo >= 1.8) return false;
+    return true;
+  });
+
+  if (compatibleDestParties.length === 0) return false;
+
+  // Ordina per opportunità politica (partiti in governo o con sondaggi in crescita)
+  compatibleDestParties.sort((a,b) => (b.inGov ? 1 : 0) - (a.inGov ? 1 : 0) || b.poll - a.poll);
+  const toParty = compatibleDestParties[0];
+
+  // Se la destinazione è il partito del giocatore e il giocatore è Segretario, apri la richiesta formale
+  if (toParty.id === game.playerPartyId && game.partyRole === 'secretary' && !document.getElementById('modalBg').classList.contains('open')) {
+    openDefectionOfferModal(pol, fromParty, toParty);
+    return true;
+  }
+
+  // Transfughismo IA universale tra partiti IA
+  pol.partyId = toParty.id;
+  if (!game.politicianPartyMap) game.politicianPartyMap = {};
+  game.politicianPartyMap[pol.id] = toParty.id;
+
+  toParty.poll = Math.min(95, +(toParty.poll + 0.15).toFixed(1));
+  toParty.cohesion = Math.max(20, (toParty.cohesion || 80) - 2);
+
+  // PUNTO 7 (1.8.1): Se chi lascia era Segretario, il vecchio partito elegge SUBITO un nuovo Segretario
+  if (fromParty.leader === pol.name) {
+    const remaining = POLITICIANS.filter(p => p.partyId === fromParty.id && p.id !== pol.id && !p.isPlayer);
+    const newLead = [...remaining].sort((a,b) => (b.clout || b.prestige || 50) - (a.clout || a.prestige || 50))[0] || generateNewPolitician(fromParty.id);
+    fromParty.leader = newLead.name;
+    fromParty.leaderAge = newLead.age;
+    syncPartyNameWithLeader(fromParty, newLead.name);
+    recordPoliticianHistory(newLead.name, `Eletto nuovo Segretario Nazionale di ${fromParty.short} in seguito all'addio di ${pol.name}`, `Segretario Nazionale ${fromParty.short}`);
+  }
+
+  // PUNTO 9 (1.8.1): Genera un nuovo membro nel vecchio partito per garantire uguaglianza numerica costante
+  generateNewPolitician(fromParty.id);
+
+  recordPoliticianHistory(pol.name, `Lascia ${fromParty.short} ed entra in ${toParty.short} per affinità politica`, `Dirigente ${toParty.short}`);
+  addFeed(`🔄 <strong>TRANSFUGHISMO A MONTECITORIO:</strong> <strong>${pol.name}</strong> lascia <strong>${fromParty.name}</strong> e passa a <strong>${toParty.name} (${toParty.short})</strong>!`);
+  setTicker(`TRANSFUGHI: ${pol.name} (${fromParty.short}) passa a ${toParty.short}!`);
+
+  recalcPolls(true);
+  updateAllUI();
+  return true;
+}
+
+export function checkAiPartySplit(p) {
+  if (!p || (p.cohesion || 75) > 28 || !p.wingLeader || p.poll < 7.0 || game.parties.length >= 26) {
+    return false;
+  }
+  executePartySplit(p, false);
+  return true;
+}
+
+
+/* PUNTI 2 & 3 (1.8.2): CABINA ELETTORALE DEL CITTADINO - TESTO PULITO SENZA UNITÀ RIDONDANTI E TUTTI I PARTITI PRESENTI */
+export function openRegionalCitizenVotingBoothModal(regId, cands, onVoted) {
+  openModal(
+    `🗳️ Cabina Elettorale di ${regId} — Esercizio del Voto di Cittadino`,
+    `<div style="font-size:13px; line-height:1.55; color:var(--text);">
+      Sei regolarmente iscritto nelle liste elettorali della Regione <strong>${regId}</strong> (tua regione di residenza).<br><br>
+      Entri nella cabina del tuo seggio elettorale con scheda e matita copiativa per esprimere il tuo <strong>voto personale e segreto</strong> per il Presidente della Giunta Regionale.<br><br>
+      Traccia il segno sulla lista o sul candidato Governatore prescelto:
+    </div>`,
+    cands.map(cand => ({
+      label: `🗳️ Vota ${cand.name} (${cand.label || cand.partyId.toUpperCase()})`,
+      fn: () => {
+        addFeed(`🗳️ <strong>VOTO REGIONALE ESPRESSO:</strong> Nella cabina di ${regId} hai espresso il tuo voto per <strong>${cand.name}</strong>.`, 'ok');
+        closeModal();
+        if (onVoted) onVoted(cand);
+      }
+    }))
+  );
+}
+
+export function openNationalCitizenVotingBoothModal(reason, onVoted) {
+  const eligibleParties = [...game.parties].filter(p => p.id !== 'ind').sort((a,b) => b.poll - a.poll);
+  openModal(
+    "🗳️ Cabina Elettorale — Elezioni Politiche della Repubblica",
+    `<div style="font-size:13px; line-height:1.55; color:var(--text);">
+      È il giorno delle <strong>Elezioni Politiche per la Camera dei Deputati (400 Seggi)</strong>!<br><br>
+      Come ogni cittadino della Repubblica Italiana, ti rechi al seggio elettorale della tua sezione con tessera elettorale e documento d'identità.<br><br>
+      Esprimi il tuo voto sulla scheda rosa per Montecitorio tracciando il segno sulla lista desiderata:
+    </div>`,
+    eligibleParties.map(pt => ({
+      label: `🗳️ Vota ${pt.name} (${pt.short}) — Sondaggi: ${pt.poll}%`,
+      fn: () => {
+        pt.poll = +(pt.poll + 0.05).toFixed(1);
+        addFeed(`🗳️ <strong>SCHEDA DEPOSITATA NELL'URNA:</strong> Hai espresso il tuo voto di cittadino per <strong>${pt.name} (${pt.short})</strong>!`, 'ok');
+        closeModal();
+        if (onVoted) onVoted(pt);
+      }
+    }))
+  );
+}
+
+/* PUNTO 15 (1.8.1): MODAL DIMISSIONI VOLONTARIE DA QUALUNQUE CARICA */
+export function openResignationModal() {
+  const offices = getPlayerOfficesList();
+  if (offices.length === 0) {
+    openModal(
+      "📜 Dimissioni da Incarichi Istituzionali",
+      `<div style="font-size:13px; line-height:1.5; color:var(--text);">
+        Al momento non ricopri alcuna carica istituzionale o di governo da cui rassegnare le dimissioni.<br><br>
+        Sei un libero dirigente/cittadino della Repubblica.
+      </div>`,
+      [{ label: "Chiudi", fn: closeModal }]
+    );
+    return;
+  }
+
+  openModal(
+    "📜 Rassegna Dimissioni da Incarichi Istituzionali",
+    `<div style="font-size:13px; line-height:1.55; color:var(--text);">
+      La Costituzione garantisce la facoltà di rimettere il proprio mandato in qualsiasi momento.<br>
+      Seleziona la carica istituzionale o politica da cui intendi <strong>rassegnare formalmente le dimissioni</strong>:
+    </div>`,
+    [
+      ...offices.map(off => ({
+        label: `🔴 Rassegna Dimissioni da: ${off.label}`,
+        fn: () => {
+          resignPlayerOffice(off.type);
+          addFeed(`📜 <strong>DIMISSIONI FORMALIZZATE:</strong> ${game.leader.name} ha rassegnato le dimissioni da <strong>${off.label}</strong>!`, 'cr');
+          setTicker(`DIMISSIONI: ${game.leader.name} si dimette da ${off.label}.`);
+          closeModal();
+          updateAllUI();
+        }
+      })),
+      {
+        label: "Annulla",
+        fn: closeModal
+      }
+    ]
+  );
+}
+
+/* PUNTO 4 (1.8.2): AZIONE DI NOMINA / REVOCA DEL TITOLO ACCESSORIO DI VICEPREMIER */
+export function toggleVicePremierAction(polId) {
+  const isPlayerPM = (game.currentPM === game.leader.name) || (game.stateForm === 'presidenziale' && game.president.isPlayer) || game.isDictatorship;
+  if (!isPlayerPM) {
+    alert("❌ Prerogativa del Presidente del Consiglio:\nSolo chi guida l'Esecutivo può conferire o revocare la funzione di Vicepresidente del Consiglio dei Ministri.");
+    return;
+  }
+  const isMinister = Object.values(game.cabinet).some(p => p && p.id === polId);
+  if (!isMinister) {
+    alert("❌ Carica accessoria:\nPer regolamento costituzionale, un Vicepremier deve essere prima di tutto titolare di un Ministero!");
+    return;
+  }
+  const pol = POLITICIANS.find(p => p.id === polId);
+  const polName = pol ? pol.name : polId;
+  const wasVP = (game.vicePremiers || []).includes(polId);
+  if (wasVP) {
+    game.vicePremiers = (game.vicePremiers || []).filter(id => id !== polId);
+    addFeed(`⭐ <strong>REVOCA VICEPREMIER:</strong> Revocata la funzione accessoria di Vicepremier a <strong>${polName}</strong>.`);
+  } else {
+    if (!game.vicePremiers) game.vicePremiers = [];
+    if (game.vicePremiers.length >= 2) {
+      const removedId = game.vicePremiers.shift();
+      const remPol = POLITICIANS.find(p => p.id === removedId);
+      addFeed(`ℹ️ Massimo 2 Vicepremier consentiti: <strong>${remPol?.name || removedId}</strong> cede il ruolo di Vicepremier.`);
+    }
+    game.vicePremiers.push(polId);
+    addFeed(`⭐ <strong>NOMINA VICEPREMIER:</strong> <strong>${polName}</strong> è nominato ufficialmente <strong>Vicepresidente del Consiglio dei Ministri</strong>!`, 'ok');
+  }
+  updateAllUI();
+}
+
+/* PUNTO 10 (1.8.2): MODAL DRAMMATICO ED EVIDENTE PER LA CADUTA DEL GOVERNO */
+export function triggerDramaticGovFallModal(reason = "Crollo irreversibile della stabilità politica di maggioranza") {
+  const norm = (s) => String(s || '').replace(/\s*\(Tecnico\)|\s*\(Indip\.\)|\s*\(Bis\)/gi, '').trim().toLowerCase();
+  const isPlayerPM = (norm(game.currentPM) === norm(game.leader.name));
+  const pmDisplayName = game.currentPM;
+
+  openModal(
+    "🚨 CRISI DI GOVERNO — IL GOVERNO È CADUTO!",
+    `<div style="font-size:13.5px; line-height:1.6; color:var(--text);">
+      <div style="background:rgba(239, 68, 68, 0.15); border:1.5px solid #ef4444; border-radius:9px; padding:12px; margin-bottom:12px; text-align:center;">
+        <div style="font-size:18px; font-weight:900; color:#f87171; letter-spacing:0.5px;">
+          💥 PALAZZO CHIGI IN CRISI: DIMISSIONI DELL'ESECUTIVO
+        </div>
+        <div style="font-size:12px; color:#fca5a5; margin-top:4px;">
+          ${reason}
+        </div>
+      </div>
+
+      Il Governo presieduto da <strong>${pmDisplayName}</strong> ${isPlayerPM ? '(il tuo Esecutivo)' : ''} non ha più la maggioranza parlamentare alla Camera e al Senato!<br><br>
+      • <strong>Stabilità dell'Esecutivo:</strong> <span style="color:#f87171; font-weight:800;">0% (Crollo Totale)</span><br>
+      • <strong>Tensione sui Mercati:</strong> Spread a <strong>${game.spread} pt</strong> (Debito Pubblico al <strong>${game.debtPct}%</strong>)<br>
+      • <strong>Passaggio Istituzionale:</strong> Il Presidente della Repubblica <strong>${game.president.name}</strong> prende atto della fine del Governo e apre formalmente le <strong>Consultazioni al Quirinale</strong> (Artt. 88-92 Costituzione).<br><br>
+      <em>Tutti i leader di partito e i capigruppo sono convocati al Colle per verificare se sia possibile formare un nuovo governo politico o se affidare l'incarico a un Governo Tecnico del Presidente.</em>
+    </div>`,
+    [
+      {
+        label: "🏛️ Sali al Colle per le Consultazioni del Presidente della Repubblica →",
+        fn: () => {
+          closeModal();
+          formTechnicalGovernment(null, 'stabilità');
+        }
+      }
+    ]
+  );
+  addFeed(`🚨 <strong>CRISI DI GOVERNO APERTA:</strong> Il Governo presieduto da <strong>${pmDisplayName}</strong> è ufficialmente caduto! Il Presidente della Repubblica apre le consultazioni al Quirinale.`, 'cr');
+  setTicker(`CRISI ISTITUZIONALE: Caduto il Governo ${pmDisplayName}. Consultazioni aperte al Quirinale!`);
+  updateAllUI();
+}
+
+/* PUNTO 12 (1.8.2): MODAL DI APPROVAZIONE INGRESSO IN COALIZIONE PER IL LEADER */
+export function openCoalitionAdmissionRequestModal(applicantParty, coalId) {
+  const p = getP();
+  const comp = computeCompat(p, applicantParty);
+  openModal(
+    `🤝 Richiesta di Ingresso nella Coalizione ${getCoalName(coalId)}`,
+    `<div style="font-size:13.5px; line-height:1.6; color:var(--text);">
+      In qualità di <strong>Leader e partito capofila della coalizione ${getCoalName(coalId)}</strong> (${p.name}), ti viene sottoposta la richiesta ufficiale di adesione:<br><br>
+      • <strong>Partito Richiedente:</strong> <strong style="color:${applicantParty.color};">${applicantParty.name} (${applicantParty.short})</strong><br>
+      • <strong>Segretario Nazionale:</strong> ${applicantParty.leader}<br>
+      • <strong>Peso Elettorale:</strong> ${applicantParty.poll}% nei sondaggi (${applicantParty.seats} Deputati a Montecitorio)<br>
+      • <strong>Compatibilità Programmatica coi tuoi Dossier:</strong> <strong>${comp.progScore}%</strong><br><br>
+      Nella tua coalizione la leadership ti garantisce il <strong>diritto di veto e la decisione vincolante</strong>:<br>
+      Accogli l'ingresso di ${applicantParty.short} nella tua alleanza o poni il veto politico del Leader?
+    </div>`,
+    [
+      {
+        label: `✅ Accetta l'ingresso di ${applicantParty.short} in ${getCoalName(coalId)}`,
+        fn: () => {
+          applicantParty.coalId = coalId;
+          addFeed(`🤝 <strong>ACCORDO DI COALIZIONE:</strong> ${game.leader.name} ha accolto la richiesta di <strong>${applicantParty.name} (${applicantParty.short})</strong>, che entra ufficialmente nella coalizione <strong>${getCoalName(coalId)}</strong>!`, 'ok');
+          closeModal();
+          updateAllUI();
+        }
+      },
+      {
+        label: `⛔ Poni il Veto Politico del Leader (Respingi Richiesta)`,
+        fn: () => {
+          addFeed(`✋ <strong>VETO DEL LEADER:</strong> Dal vertice di ${p.short}, ${game.leader.name} ha posto il <strong>veto politico insormontabile</strong> all'ingresso di <strong>${applicantParty.short}</strong> nella coalizione ${getCoalName(coalId)}!`);
+          closeModal();
+          updateAllUI();
+        }
+      }
+    ]
+  );
+}

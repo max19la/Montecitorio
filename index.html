@@ -6,22 +6,22 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <title>MONTECITORIO 1.7 — Simulatore Politico Italiano</title>
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
+  <title>MONTECITORIO 1.8.2 — Simulatore Politico & Istituzionale Italiano</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg-0: #040710;
-      --bg-1: #0a1020;
-      --bg-2: #111a30;
-      --bg-3: #192644;
-      --gold: #e5b842;
-      --gold-lt: #fde68a;
-      --gold-bd: rgba(229, 184, 66, 0.38);
+      --bg-0: #050811;
+      --bg-1: #0b1222;
+      --bg-2: #121d35;
+      --bg-3: #1b2b4d;
+      --gold: #eab308;
+      --gold-lt: #fef08a;
+      --gold-bd: rgba(234, 179, 8, 0.42);
       --party-color: #2563eb;
       --party-rgb: 37, 99, 235;
-      --party-glow: rgba(var(--party-rgb), 0.36);
+      --party-glow: rgba(var(--party-rgb), 0.38);
       --party-soft: rgba(var(--party-rgb), 0.16);
-      --party-border: rgba(var(--party-rgb), 0.58);
+      --party-border: rgba(var(--party-rgb), 0.62);
       --it-g: #009246;
       --it-w: #f8fafc;
       --it-r: #ce2b37;
@@ -31,8 +31,8 @@
       --ok: #10b981;
       --err: #ef4444;
       --warn: #f59e0b;
-      --bd: rgba(255, 255, 255, 0.11);
-      --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+      --bd: rgba(255, 255, 255, 0.12);
+      --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.16);
     }
 
     *, *::before, *::after {
@@ -41,45 +41,55 @@
       padding: 0;
     }
 
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes pulseDot {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.28); opacity: 0.65; }
+    }
+
     /* Custom Scrollbars for Modern Dashboard Feel */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: rgba(4, 7, 16, 0.6); border-radius: 99px; }
-    ::-webkit-scrollbar-thumb { background: rgba(229, 184, 66, 0.35); border-radius: 99px; }
-    ::-webkit-scrollbar-thumb:hover { background: rgba(229, 184, 66, 0.65); }
+    ::-webkit-scrollbar-track { background: rgba(5, 8, 17, 0.7); border-radius: 99px; }
+    ::-webkit-scrollbar-thumb { background: rgba(234, 179, 8, 0.4); border-radius: 99px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(234, 179, 8, 0.75); }
 
     body {
       font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
       font-size: 14px;
-      line-height: 1.5;
+      line-height: 1.52;
       background-color: var(--bg-0);
       background-image:
-        radial-gradient(circle at 10% 6%, rgba(var(--party-rgb), 0.34) 0%, transparent 44%),
-        radial-gradient(circle at 90% 88%, rgba(229, 184, 66, 0.14) 0%, transparent 48%),
-        radial-gradient(circle at 50% 0%, #14223d 0%, var(--bg-0) 76%),
-        linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
-      background-size: 100% 100%, 100% 100%, 100% 100%, 36px 36px, 36px 36px;
+        radial-gradient(circle at 12% 4%, rgba(var(--party-rgb), 0.32) 0%, transparent 42%),
+        radial-gradient(circle at 88% 92%, rgba(234, 179, 8, 0.15) 0%, transparent 46%),
+        radial-gradient(circle at 50% 0%, #162647 0%, var(--bg-0) 78%),
+        linear-gradient(rgba(255, 255, 255, 0.022) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.022) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 100% 100%, 40px 40px, 40px 40px;
       background-attachment: fixed;
       color: var(--txt);
       min-height: 100vh;
       overflow-x: hidden;
-      transition: background-image 0.5s ease, background-color 0.5s ease;
+      transition: background-image 0.45s ease, background-color 0.45s ease;
     }
 
-    /* TEMA BIANCO ISTITUZIONALE PER GLI INDIPENDENTI */
+    /* TEMA BIANCO ISTITUZIONALE PER GLI INDIPENDENTI E QUIRINALE */
     body.theme-ind {
-      background-color: #0b1120;
+      background-color: #090f1d;
       background-image:
-        radial-gradient(circle at 15% 10%, rgba(255, 255, 255, 0.25) 0%, transparent 50%),
-        radial-gradient(circle at 85% 85%, rgba(248, 250, 252, 0.18) 0%, transparent 55%),
-        radial-gradient(circle at 50% 0%, #1e293b 0%, #070b14 80%);
+        radial-gradient(circle at 15% 10%, rgba(255, 255, 255, 0.22) 0%, transparent 50%),
+        radial-gradient(circle at 85% 85%, rgba(234, 179, 8, 0.16) 0%, transparent 55%),
+        radial-gradient(circle at 50% 0%, #1e293b 0%, #060a14 82%);
     }
     body.theme-ind .glass {
-      border-top-color: #ffffff;
-      box-shadow: var(--glass-highlight), 0 18px 42px rgba(0, 0, 0, 0.55), 0 0 26px rgba(255, 255, 255, 0.1);
+      border-top-color: #f8fafc;
+      box-shadow: var(--glass-highlight), 0 20px 46px rgba(0, 0, 0, 0.6), 0 0 28px rgba(255, 255, 255, 0.08);
     }
     body.theme-ind .btn:not(.btn-w):not(.btn-m):not(.btn-r) {
-      background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
+      background: linear-gradient(135deg, #ffffff 0%, #dbeafe 100%);
       color: #0f172a !important;
       border-color: #ffffff;
       font-weight: 800;
@@ -88,9 +98,9 @@
     /* TEMA DITTATURA / REGIME */
     body.theme-regime {
       background-image:
-        radial-gradient(circle at 15% 10%, rgba(185, 28, 28, 0.35) 0%, transparent 50%),
-        radial-gradient(circle at 85% 85%, rgba(0, 0, 0, 0.85) 0%, transparent 60%),
-        radial-gradient(circle at 50% 0%, #1f0909 0%, #050507 85%);
+        radial-gradient(circle at 15% 10%, rgba(185, 28, 28, 0.38) 0%, transparent 50%),
+        radial-gradient(circle at 85% 85%, rgba(0, 0, 0, 0.88) 0%, transparent 60%),
+        radial-gradient(circle at 50% 0%, #240808 0%, #050507 85%);
     }
 
     h1, h2, h3, .serif { font-family: 'Cinzel', Georgia, serif; }
@@ -98,17 +108,17 @@
     /* LINK CLICCABILI PER TUTTI I POLITICI (PUNTO 5) */
     .pol-click-link {
       cursor: pointer;
-      border-bottom: 1px dashed rgba(253, 230, 138, 0.55);
-      padding: 0 2px;
+      border-bottom: 1px dashed rgba(254, 240, 138, 0.6);
+      padding: 0 3px;
       border-radius: 4px;
       transition: all 0.16s ease;
     }
     .pol-click-link:hover {
       color: var(--gold-lt) !important;
-      background: rgba(229, 184, 66, 0.16);
+      background: rgba(234, 179, 8, 0.18);
       border-bottom-style: solid;
       border-bottom-color: var(--gold-lt);
-      text-shadow: 0 0 10px rgba(253, 230, 138, 0.45);
+      text-shadow: 0 0 10px rgba(254, 240, 138, 0.45);
     }
 
     .tricolor {
@@ -118,63 +128,77 @@
       top: 0; left: 0;
       z-index: 4000;
       background: linear-gradient(90deg, var(--it-g) 0 33.3%, var(--it-w) 33.3% 66.6%, var(--it-r) 66.6% 100%);
-      box-shadow: 0 2px 16px rgba(0, 0, 0, 0.75);
+      box-shadow: 0 2px 18px rgba(0, 0, 0, 0.85);
     }
 
     /* SCHERMATA SETUP */
     #setupView {
-      max-width: 1460px;
+      max-width: 1480px;
       margin: 22px auto;
       padding: 18px;
+      animation: fadeSlideIn 0.35s ease-out;
     }
 
     .hero-box {
       position: relative;
       overflow: hidden;
       background:
-        radial-gradient(circle at 50% 0%, rgba(229, 184, 66, 0.22) 0%, transparent 65%),
-        linear-gradient(135deg, rgba(var(--party-rgb), 0.28) 0%, rgba(9, 15, 29, 0.96) 55%, rgba(229, 184, 66, 0.18) 100%);
-      border: 1px solid rgba(229, 184, 66, 0.45);
+        radial-gradient(circle at 50% -10%, rgba(234, 179, 8, 0.28) 0%, transparent 62%),
+        linear-gradient(135deg, rgba(var(--party-rgb), 0.30) 0%, rgba(8, 14, 28, 0.96) 52%, rgba(234, 179, 8, 0.20) 100%);
+      border: 1px solid rgba(234, 179, 8, 0.5);
       border-top: 3px solid var(--gold-lt);
       border-radius: 22px;
       padding: 28px 24px;
       text-align: center;
       margin-bottom: 18px;
-      box-shadow: var(--glass-highlight), 0 22px 55px rgba(0, 0, 0, 0.65), 0 0 40px var(--party-soft);
+      box-shadow: var(--glass-highlight), 0 24px 60px rgba(0, 0, 0, 0.7), 0 0 44px var(--party-soft);
       transition: all 0.4s ease;
+    }
+
+    .hero-box::after {
+      content: "";
+      position: absolute;
+      bottom: 0;
+      left: 15%;
+      right: 15%;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--it-g), var(--it-w), var(--it-r), transparent);
+      opacity: 0.75;
     }
 
     .hero-badge {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      background: rgba(229, 184, 66, 0.14);
-      border: 1px solid rgba(229, 184, 66, 0.45);
+      background: rgba(234, 179, 8, 0.16);
+      border: 1px solid rgba(234, 179, 8, 0.55);
       color: var(--gold-lt);
       font-size: 11px;
       font-weight: 800;
-      letter-spacing: 1.6px;
+      letter-spacing: 1.8px;
       text-transform: uppercase;
-      padding: 4px 14px;
+      padding: 5px 16px;
       border-radius: 999px;
       margin-bottom: 8px;
+      box-shadow: 0 4px 14px rgba(234, 179, 8, 0.18);
     }
 
     .hero-box h1 {
-      font-size: clamp(30px, 4vw, 48px);
-      background: linear-gradient(180deg, #ffffff 0%, #fde68a 65%, #d97706 100%);
+      font-size: clamp(32px, 4.2vw, 50px);
+      background: linear-gradient(180deg, #ffffff 0%, #fef08a 62%, #eab308 100%);
+      background-clip: text;
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
-      letter-spacing: 2.5px;
+      letter-spacing: 3px;
       margin-bottom: 4px;
       font-weight: 900;
-      text-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+      text-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
     }
 
     .hero-box p.hero-sub {
-      font-size: 14px;
-      color: #cbd5e1;
-      letter-spacing: 2px;
+      font-size: 13.5px;
+      color: #e2e8f0;
+      letter-spacing: 2.4px;
       text-transform: uppercase;
       font-weight: 700;
     }
@@ -188,37 +212,41 @@
 
     .setup-grid {
       display: grid;
-      grid-template-columns: 430px 1fr;
+      grid-template-columns: 440px 1fr;
       gap: 20px;
     }
 
     .glass {
-      background: linear-gradient(165deg, rgba(16, 25, 46, 0.88) 0%, rgba(8, 13, 25, 0.94) 100%);
-      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: linear-gradient(165deg, rgba(16, 26, 48, 0.92) 0%, rgba(8, 13, 26, 0.96) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.13);
       border-top: 3px solid var(--party-color);
       border-radius: 18px;
       padding: 18px;
-      box-shadow: var(--glass-highlight), 0 18px 42px rgba(0, 0, 0, 0.55), 0 0 28px rgba(var(--party-rgb), 0.08);
-      backdrop-filter: blur(20px) saturate(150%);
-      -webkit-backdrop-filter: blur(20px) saturate(150%);
-      transition: border-color 0.35s ease, box-shadow 0.35s ease;
+      box-shadow: var(--glass-highlight), 0 20px 48px rgba(0, 0, 0, 0.6), 0 0 28px rgba(var(--party-rgb), 0.08);
+      backdrop-filter: blur(22px) saturate(160%);
+      -webkit-backdrop-filter: blur(22px) saturate(160%);
+      transition: border-color 0.3s ease, box-shadow 0.3s ease;
       min-width: 0;
+      animation: fadeSlideIn 0.24s ease-out;
     }
 
     .sec-hdr {
       font-family: 'Cinzel', serif;
-      font-size: 15px;
+      font-size: 14.5px;
       font-weight: 800;
       color: var(--gold-lt);
-      padding-bottom: 10px;
+      padding: 4px 0 10px 10px;
       margin-bottom: 14px;
-      border-bottom: 1px solid rgba(229, 184, 66, 0.22);
+      border-left: 3px solid var(--gold);
+      border-bottom: 1px solid rgba(234, 179, 8, 0.24);
       display: flex;
       justify-content: space-between;
       align-items: center;
       flex-wrap: wrap;
       gap: 8px;
-      letter-spacing: 0.4px;
+      letter-spacing: 0.45px;
+      background: linear-gradient(90deg, rgba(234, 179, 8, 0.07) 0%, transparent 70%);
+      border-radius: 2px 0 0 0;
     }
 
     .fld { margin-bottom: 12px; }
@@ -229,133 +257,135 @@
       text-transform: uppercase;
       color: #94a3b8;
       margin-bottom: 5px;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.06em;
     }
 
     input, select {
       width: 100%;
       padding: 10px 13px;
-      background: rgba(11, 18, 34, 0.9);
-      border: 1px solid rgba(255, 255, 255, 0.16);
+      background: rgba(10, 17, 32, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.18);
       border-radius: 10px;
       color: var(--txt);
       font-size: 13.5px;
       font-family: inherit;
-      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.35);
+      box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.4);
     }
 
     input:focus, select:focus {
       outline: none;
       border-color: var(--gold-lt);
-      box-shadow: 0 0 0 3px rgba(229, 184, 66, 0.2);
+      box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.22);
     }
 
     .p-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(222px, 1fr));
       gap: 10px;
-      max-height: 530px;
+      max-height: 540px;
       overflow-y: auto;
       padding-right: 6px;
     }
 
     .p-card {
-      background: linear-gradient(145deg, rgba(19, 29, 51, 0.92), rgba(11, 18, 34, 0.92));
-      border: 1.5px solid rgba(255, 255, 255, 0.1);
-      border-radius: 13px;
-      padding: 11px;
+      background: linear-gradient(145deg, rgba(20, 31, 56, 0.94), rgba(10, 17, 32, 0.96));
+      border: 1.5px solid rgba(255, 255, 255, 0.11);
+      border-radius: 14px;
+      padding: 11px 12px;
       cursor: pointer;
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 11px;
       transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-      box-shadow: var(--glass-highlight), 0 4px 12px rgba(0, 0, 0, 0.25);
+      box-shadow: var(--glass-highlight), 0 6px 16px rgba(0, 0, 0, 0.3);
     }
 
     .p-card:hover {
-      background: linear-gradient(145deg, rgba(28, 42, 72, 0.95), rgba(16, 25, 46, 0.95));
-      border-color: rgba(253, 230, 138, 0.45);
-      transform: translateY(-2px);
-      box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
+      background: linear-gradient(145deg, rgba(29, 44, 78, 0.98), rgba(16, 26, 48, 0.98));
+      border-color: rgba(254, 240, 138, 0.55);
+      transform: translateY(-2.5px);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
     }
 
     .p-card.sel {
       border-color: var(--party-color);
-      background: linear-gradient(135deg, var(--party-soft), rgba(229, 184, 66, 0.16));
-      box-shadow: 0 0 0 1px var(--party-color), 0 8px 24px var(--party-soft);
+      background: linear-gradient(135deg, var(--party-soft), rgba(234, 179, 8, 0.18));
+      box-shadow: 0 0 0 1.5px var(--party-color), 0 10px 26px var(--party-soft);
     }
 
     .btn-gold {
-      background: linear-gradient(135deg, #fde68a 0%, #eab308 50%, #ca8a04 100%);
-      color: #040710;
+      background: linear-gradient(135deg, #fef08a 0%, #eab308 50%, #ca8a04 100%);
+      color: #050811;
       font-weight: 900;
-      letter-spacing: 0.3px;
-      border: 1px solid #fef08a;
+      letter-spacing: 0.4px;
+      border: 1px solid #fef9c3;
       padding: 14px 20px;
       border-radius: 12px;
       font-size: 15px;
       cursor: pointer;
       width: 100%;
       margin-top: 12px;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 10px 26px rgba(229, 184, 66, 0.35);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 12px 28px rgba(234, 179, 8, 0.38);
       transition: transform 0.18s ease, filter 0.18s ease, box-shadow 0.18s ease;
     }
 
     .btn-gold:hover {
-      filter: brightness(1.07);
+      filter: brightness(1.08);
       transform: translateY(-2px);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 14px 32px rgba(229, 184, 66, 0.48);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 16px 34px rgba(234, 179, 8, 0.52);
     }
 
-    /* TOPBAR PRINCIPALE */
+    /* TOPBAR PRINCIPALE STILE COMMAND DECK ISTITUZIONALE */
     #appView { display: none; padding-top: 5px; }
 
     .topbar {
-      background: linear-gradient(90deg, rgba(6, 10, 20, 0.96) 0%, rgba(var(--party-rgb), 0.22) 50%, rgba(6, 10, 20, 0.96) 100%);
-      border-bottom: 1px solid var(--party-border);
-      padding: 10px 20px;
+      background: linear-gradient(90deg, rgba(6, 10, 22, 0.98) 0%, rgba(var(--party-rgb), 0.24) 50%, rgba(6, 10, 22, 0.98) 100%);
+      border-bottom: 1.5px solid var(--party-border);
+      padding: 10px 22px;
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
+      gap: 14px;
       position: sticky;
       top: 5px;
       z-index: 2000;
-      backdrop-filter: blur(20px) saturate(160%);
-      -webkit-backdrop-filter: blur(20px) saturate(160%);
-      box-shadow: 0 10px 32px rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(22px) saturate(170%);
+      -webkit-backdrop-filter: blur(22px) saturate(170%);
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.72);
     }
 
     .id-badge {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 13px;
       min-width: 0;
-      background: rgba(15, 23, 42, 0.65);
-      padding: 5px 12px 5px 8px;
-      border-radius: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: linear-gradient(135deg, rgba(15, 24, 44, 0.92), rgba(8, 13, 26, 0.92));
+      padding: 6px 14px 6px 9px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-left: 3px solid var(--party-color);
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
     }
 
     #topLogo {
-      width: 44px !important;
-      height: 44px !important;
+      width: 46px !important;
+      height: 46px !important;
       flex-shrink: 0;
       filter: drop-shadow(0 0 10px var(--party-glow));
       transition: transform 0.2s ease;
     }
-    #topLogo:hover { transform: scale(1.07); }
+    #topLogo:hover { transform: scale(1.08); }
 
     #topLeader {
-      font-size: 15px !important;
+      font-size: 15.5px !important;
       font-weight: 800;
       color: #fff;
-      border-bottom: 1px dashed rgba(253, 230, 138, 0.5);
+      border-bottom: 1px dashed rgba(254, 240, 138, 0.55);
       transition: color 0.15s ease;
     }
     #topLeader:hover { color: var(--gold-lt); }
-    #topSub { font-size: 11.5px !important; color: #94a3b8 !important; }
+    #topSub { font-size: 11.5px !important; color: #cbd5e1 !important; margin-top: 1px; }
 
     .pill-role {
       font-size: 10.5px;
@@ -364,16 +394,16 @@
       font-weight: 800;
       text-transform: uppercase;
       white-space: nowrap;
-      letter-spacing: 0.4px;
+      letter-spacing: 0.45px;
     }
 
-    .r-pm { background: linear-gradient(135deg, rgba(229, 184, 66, 0.32), rgba(202, 138, 4, 0.2)); color: var(--gold-lt); border: 1px solid var(--gold); box-shadow: 0 0 12px rgba(229, 184, 66, 0.25); }
-    .r-gov { background: rgba(16, 185, 129, 0.22); color: #34d399; border: 1px solid var(--ok); }
-    .r-opp { background: rgba(239, 68, 68, 0.22); color: #f87171; border: 1px solid var(--err); }
+    .r-pm { background: linear-gradient(135deg, rgba(234, 179, 8, 0.35), rgba(202, 138, 4, 0.22)); color: var(--gold-lt); border: 1px solid var(--gold); box-shadow: 0 0 14px rgba(234, 179, 8, 0.28); }
+    .r-gov { background: rgba(16, 185, 129, 0.24); color: #34d399; border: 1px solid var(--ok); }
+    .r-opp { background: rgba(239, 68, 68, 0.24); color: #f87171; border: 1px solid var(--err); }
     .r-ind { background: #ffffff; color: #0f172a; border: 1px solid #cbd5e1; font-weight: 900; }
     .r-dict { background: linear-gradient(135deg, #991b1b, #450a0a); color: #fde047; border: 1px solid #ef4444; }
 
-    /* KPI INTERATTIVI STILE TELEMETRIA MODERNA (PUNTO 9 & 18) */
+    /* KPI INTERATTIVI STILE TELEMETRIA MODERNA (PUNTO 5 & 9) */
     .kpi-strip {
       display: flex;
       gap: 7px;
@@ -382,25 +412,25 @@
     }
 
     .kpi {
-      background: linear-gradient(180deg, rgba(21, 32, 56, 0.92) 0%, rgba(11, 18, 33, 0.95) 100%);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-top: 1px solid rgba(255, 255, 255, 0.2);
+      background: linear-gradient(180deg, rgba(22, 34, 62, 0.94) 0%, rgba(10, 17, 32, 0.98) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.13);
+      border-top: 1px solid rgba(255, 255, 255, 0.24);
       border-bottom: 2.5px solid var(--party-color);
-      padding: 6px 11px;
-      border-radius: 11px;
-      min-width: 86px;
+      padding: 6px 12px;
+      border-radius: 12px;
+      min-width: 88px;
       flex-shrink: 0;
       cursor: pointer;
       transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
       position: relative;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
     }
 
     .kpi:hover {
-      background: linear-gradient(180deg, rgba(30, 45, 78, 0.96) 0%, rgba(17, 26, 48, 0.98) 100%);
+      background: linear-gradient(180deg, rgba(32, 48, 84, 0.98) 0%, rgba(18, 28, 52, 0.99) 100%);
       transform: translateY(-2px);
       border-color: var(--gold-lt);
-      box-shadow: 0 8px 20px rgba(229, 184, 66, 0.22);
+      box-shadow: 0 8px 22px rgba(234, 179, 8, 0.26);
     }
 
     .kpi-l {
@@ -408,7 +438,7 @@
       text-transform: uppercase;
       color: #94a3b8;
       font-weight: 800;
-      letter-spacing: 0.04em;
+      letter-spacing: 0.05em;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -418,7 +448,7 @@
     .kpi-l .info-dot {
       color: var(--gold-lt);
       font-size: 10px;
-      opacity: 0.85;
+      opacity: 0.9;
     }
 
     .kpi-v {
@@ -429,17 +459,17 @@
       letter-spacing: -0.2px;
     }
 
-    /* BARRA DEDICATA E FISSA PER L'AVANZAMENTO DEL TEMPO */
+    /* BARRA DEDICATA E FISSA PER L'AVANZAMENTO GIORNALIERO DEL TEMPO */
     .time-command-bar {
-      background: linear-gradient(90deg, rgba(8, 13, 25, 0.98) 0%, rgba(22, 34, 60, 0.96) 50%, rgba(8, 13, 25, 0.98) 100%);
+      background: linear-gradient(90deg, rgba(7, 12, 24, 0.98) 0%, rgba(20, 32, 58, 0.97) 50%, rgba(7, 12, 24, 0.98) 100%);
       border-bottom: 1.5px solid var(--gold-bd);
-      padding: 8px 20px;
+      padding: 8px 22px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       flex-wrap: wrap;
       gap: 12px;
-      box-shadow: 0 6px 22px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
     }
 
     .time-display-group {
@@ -453,11 +483,11 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      background: rgba(4, 7, 16, 0.9);
+      background: rgba(4, 7, 16, 0.92);
       border: 1px solid var(--gold);
       padding: 5px 14px;
       border-radius: 10px;
-      box-shadow: inset 0 0 14px rgba(229, 184, 66, 0.16);
+      box-shadow: inset 0 0 14px rgba(234, 179, 8, 0.18);
     }
 
     .date-txt {
@@ -472,10 +502,10 @@
     .turn-counter-pill {
       font-size: 11.5px;
       color: var(--muted);
-      background: rgba(17, 26, 48, 0.85);
-      padding: 4px 10px;
+      background: rgba(17, 27, 50, 0.88);
+      padding: 4px 11px;
       border-radius: 8px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.13);
       font-weight: 700;
     }
 
@@ -507,38 +537,38 @@
       gap: 6px;
       transition: all 0.16s ease;
       white-space: nowrap;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 4px 10px rgba(0,0,0,0.3);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 4px 12px rgba(0,0,0,0.35);
     }
     .btn-time:hover {
       transform: translateY(-1.5px);
       filter: brightness(1.12);
     }
     .btn-t1 { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff; }
-    .btn-t7 { background: linear-gradient(135deg, #fde68a, #ca8a04); color: #050811; border-color: #fde68a; }
+    .btn-t7 { background: linear-gradient(135deg, #fef08a, #ca8a04); color: #050811; border-color: #fef08a; }
     .btn-t30 { background: linear-gradient(135deg, #10b981, #059669); color: #fff; border-color: #34d399; }
 
     .btn {
       background: linear-gradient(135deg, var(--party-color), #1e40af);
       color: #fff;
-      border: 1px solid rgba(255, 255, 255, 0.18);
+      border: 1px solid rgba(255, 255, 255, 0.2);
       padding: 8px 13px;
-      border-radius: 9px;
+      border-radius: 10px;
       font-weight: 700;
       font-size: 12.5px;
       cursor: pointer;
       transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
       line-height: 1.3;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 3px 8px rgba(0, 0, 0, 0.28);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 4px 10px rgba(0, 0, 0, 0.3);
     }
 
     .btn:hover:not(:disabled) {
       filter: brightness(1.14);
       transform: translateY(-1.5px);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 6px 14px rgba(0, 0, 0, 0.38);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.32), 0 6px 16px rgba(0, 0, 0, 0.42);
     }
 
     .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-    .btn-w { background: linear-gradient(135deg, #fde68a, #ca8a04) !important; color: #050811 !important; border: 1px solid #fef08a !important; font-weight: 800; }
+    .btn-w { background: linear-gradient(135deg, #fef08a, #ca8a04) !important; color: #050811 !important; border: 1px solid #fef9c3 !important; font-weight: 800; }
     .btn-m { background: linear-gradient(135deg, #10b981, #059669) !important; color: #fff !important; border-color: #34d399 !important; }
     .btn-r { background: linear-gradient(135deg, #ef4444, #b91c1c) !important; color: #fff !important; border-color: #f87171 !important; }
 
@@ -566,12 +596,12 @@
     }
 
     .ticker {
-      background: rgba(8, 13, 25, 0.96);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-      padding: 7px 20px;
+      background: linear-gradient(90deg, rgba(6, 10, 22, 0.98), rgba(14, 23, 44, 0.96), rgba(6, 10, 22, 0.98));
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 7px 22px;
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
       font-size: 13px;
     }
 
@@ -579,21 +609,21 @@
       background: linear-gradient(135deg, #ef4444, #b91c1c);
       color: #fff;
       font-weight: 800;
-      font-size: 10px;
-      padding: 3px 9px;
+      font-size: 10.5px;
+      padding: 3px 10px;
       border-radius: 6px;
       flex-shrink: 0;
-      letter-spacing: 0.6px;
-      box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+      letter-spacing: 0.7px;
+      box-shadow: 0 0 12px rgba(239, 68, 68, 0.45);
     }
 
-    /* ARCHITETTURA DESKTOP SPAZIOSA */
+    /* ARCHITETTURA DESKTOP WAR-ROOM */
     .war-room {
-      max-width: 1740px;
+      max-width: 1760px;
       margin: 14px auto;
-      padding: 0 16px 44px;
+      padding: 0 16px 48px;
       display: grid;
-      grid-template-columns: 325px minmax(0, 1fr) 325px;
+      grid-template-columns: 330px minmax(0, 1fr) 330px;
       grid-template-rows: auto 1fr;
       gap: 16px;
       align-items: start;
@@ -604,20 +634,20 @@
       display: grid;
       grid-template-columns: repeat(5, 1fr);
       gap: 8px;
-      background: linear-gradient(180deg, rgba(14, 22, 40, 0.94) 0%, rgba(8, 13, 25, 0.96) 100%);
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      border-top: 2px solid var(--gold-bd);
-      padding: 9px;
-      border-radius: 16px;
-      box-shadow: var(--glass-highlight), 0 12px 32px rgba(0, 0, 0, 0.5);
+      background: linear-gradient(180deg, rgba(15, 24, 45, 0.96) 0%, rgba(8, 13, 26, 0.98) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-top: 2.5px solid var(--gold-bd);
+      padding: 10px;
+      border-radius: 18px;
+      box-shadow: var(--glass-highlight), 0 14px 36px rgba(0, 0, 0, 0.55);
     }
 
     .nav-item {
-      background: rgba(19, 29, 51, 0.78);
-      border: 1px solid rgba(255, 255, 255, 0.09);
+      background: linear-gradient(160deg, rgba(22, 34, 62, 0.82), rgba(12, 20, 38, 0.88));
+      border: 1px solid rgba(255, 255, 255, 0.1);
       color: #cbd5e1;
       padding: 10px 12px;
-      border-radius: 11px;
+      border-radius: 12px;
       font-weight: 700;
       font-size: 12.5px;
       cursor: pointer;
@@ -627,37 +657,41 @@
       justify-content: center;
       gap: 7px;
       transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+      overflow: hidden;
     }
 
     .nav-item:hover {
-      background: rgba(30, 45, 76, 0.92);
+      background: linear-gradient(160deg, rgba(32, 48, 84, 0.95), rgba(18, 29, 54, 0.95));
       color: #ffffff;
-      border-color: rgba(253, 230, 138, 0.35);
-      transform: translateY(-1.5px);
+      border-color: rgba(254, 240, 138, 0.45);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
     }
 
     .nav-item.active {
-      background: linear-gradient(135deg, rgba(var(--party-rgb), 0.52), rgba(229, 184, 66, 0.28));
+      background: linear-gradient(135deg, rgba(var(--party-rgb), 0.58), rgba(234, 179, 8, 0.30));
       color: #ffffff;
       font-weight: 800;
       border-color: var(--gold-lt);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 6px 18px var(--party-glow);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 8px 20px var(--party-glow);
     }
 
     /* SONDAGGI E CARTE */
     .poll-r {
       margin-bottom: 6px;
-      padding: 6px 8px;
+      padding: 7px 9px;
       border-radius: 10px;
-      border: 1px solid transparent;
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      background: rgba(15, 23, 42, 0.45);
       cursor: pointer;
       transition: all 0.16s ease;
     }
 
     .poll-r:hover {
-      background: rgba(255, 255, 255, 0.06);
-      border-color: rgba(255, 255, 255, 0.12);
-      transform: translateX(2px);
+      background: rgba(30, 45, 78, 0.65);
+      border-color: rgba(254, 240, 138, 0.35);
+      transform: translateX(3px);
     }
 
     .poll-h {
@@ -678,8 +712,8 @@
     }
 
     .mini-svg {
-      width: 21px;
-      height: 21px;
+      width: 22px;
+      height: 22px;
       flex-shrink: 0;
       display: inline-flex;
     }
@@ -689,7 +723,7 @@
       background: rgba(255, 255, 255, 0.09);
       border-radius: 99px;
       overflow: hidden;
-      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45);
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
     }
 
     .p-fill, .bar-f, .pfill {
@@ -701,15 +735,21 @@
     .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
     .grid3 { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
 
-    .box, .manifesto-box {
-      background: linear-gradient(165deg, rgba(19, 29, 51, 0.86) 0%, rgba(11, 18, 34, 0.92) 100%);
-      border: 1px solid rgba(255, 255, 255, 0.11);
+    .box, .manifesto-box, .law-card {
+      background: linear-gradient(165deg, rgba(20, 31, 56, 0.88) 0%, rgba(10, 17, 32, 0.94) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.12);
       border-radius: 14px;
       padding: 14px;
       margin-bottom: 10px;
       min-width: 0;
       overflow-wrap: break-word;
-      box-shadow: var(--glass-highlight), 0 6px 18px rgba(0, 0, 0, 0.26);
+      box-shadow: var(--glass-highlight), 0 8px 22px rgba(0, 0, 0, 0.3);
+      transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .law-card:hover {
+      border-color: rgba(234, 179, 8, 0.4) !important;
+      box-shadow: var(--glass-highlight), 0 12px 28px rgba(0, 0, 0, 0.45) !important;
     }
 
     .box h4 {
@@ -722,7 +762,7 @@
     .box p {
       font-size: 12.5px;
       color: var(--muted);
-      line-height: 1.48;
+      line-height: 1.5;
     }
 
     /* GRIGLIA PROGRAMMA A 5 POSIZIONI CON ORIENTAMENTO POLITICO ESPLICITO */
@@ -1158,30 +1198,30 @@
   <!-- SCHERMATA MENU PRINCIPALE -->
   <section id="setupView">
     <div class="hero-box">
-      <div class="hero-badge">🇮🇹 REPUBBLICA ITALIANA • EDIZIONE UFFICIALE 1.7</div>
-      <h1>MONTECITORIO 1.7</h1>
-      <p class="hero-sub">Simulatore Politico & Istituzionale</p>
+      <div class="hero-badge">🇮🇹 REPUBBLICA ITALIANA • EDIZIONE UFFICIALE 1.8.2</div>
+      <h1>MONTECITORIO 1.8.2</h1>
+      <p class="hero-sub">Simulatore Politico, Parlamentare &amp; Regionale</p>
     </div>
 
-    <!-- SEZIONE NOVITÀ DELL'AGGIORNAMENTO (1.7) + GUIDA NUOVI GIOCATORI (PUNTO 10: FORMATO CONCISO) -->
+    <!-- SEZIONE NOVITÀ DELL'AGGIORNAMENTO (1.8.2) + GUIDA NUOVI GIOCATORI (FORMATO CONCISO) -->
     <div class="setup-info-bar">
       <div class="glass" style="border-top-color:var(--gold);">
         <div class="sec-hdr">
-          <span>🔥 Novità della Versione 1.7</span>
-          <span style="font-size:11px; color:var(--ok); font-weight:800;">Nuove Funzionalità & Changelog</span>
+          <span>🔥 Novità della Versione 1.8.2</span>
+          <span style="font-size:11px; color:var(--ok); font-weight:800;">12 Risoluzioni &amp; Miglioramenti</span>
         </div>
         <div style="font-size:12.5px; color:var(--muted); line-height:1.5; max-height:215px; overflow-y:auto; padding-right:6px;">
-          <div style="color:var(--gold-lt); font-weight:800; font-size:11.5px; text-transform:uppercase; letter-spacing:0.6px; margin-bottom:4px;">✨ Nuove Funzionalità Introdotte</div>
-          • <strong>267 Politici Reali & 62 Protagonisti Giocabili</strong>: ampliato il database parlamentare per tutti i 24 partiti (inclusi <em>Silvia Sardone</em>, <em>Matteo Hallissey</em>, governatori, ministri e capigruppo).<br>
-          • <strong>Governo IA Dinamico e Attivo</strong>: quando giochi all'opposizione o fuori dall'esecutivo, il Governo IA emana decreti, propone riforme sui 16 Temi Caldi, indice referendum e vara manovre di bilancio.<br>
-          • <strong>Riforme dell'Ordinamento dello Stato Reali</strong>: passare a <em>Presidenzialismo</em>, <em>Premierato</em>, <em>Cancellierato</em> o <em>Repubblica Federale</em> trasforma realmente cariche, crisi di governo, sfiducia costruttiva ed elezioni.<br>
-          • <strong>Eventi Speciali & Opposizione Costruttiva</strong>: nuovi eventi dedicati a campagne elettorali, referendum, Quirinale e crisi, con scelte sia di opposizione dura che costruttiva/bipartisan.<br>
-          • <strong>Restyling Dashboard & Nomi Cliccabili Ovunque</strong>: nuova interfaccia glassmorphic ad alto contrasto; ogni nome di politico in qualsiasi menu apre la sua scheda biografica e Bussola 2D.<br>
-          <div style="color:#38bdf8; font-weight:800; font-size:11px; text-transform:uppercase; letter-spacing:0.6px; margin:8px 0 3px; padding-top:6px; border-top:1px solid rgba(255,255,255,0.1);">🛠️ Bug Fix Principali (1.7)</div>
-          • Aggiornamento in tempo reale del curriculum nelle schede politici e dicitura <em>Presidente della Repubblica</em> unificata.<br>
-          • Consultazioni obbligatorie al Quirinale prima dello scioglimento delle Camere (Art. 88 Cost.) e banner esplicito dei partiti al Governo.<br>
-          • Indicazione del partito dei candidati al Quirinale, coalizione attuale nelle schede partito e nome dinamico per <em>Lega per [Segretario] Premier</em>.<br>
-          • Trasferimento reale di parlamentari nei partiti nati da scissioni, ponderazione ISTAT regionale/nazionale e scale sondaggi dinamiche.
+          <div style="color:var(--gold-lt); font-weight:800; font-size:11.5px; text-transform:uppercase; letter-spacing:0.6px; margin-bottom:4px;">✨ Nuove Funzionalità &amp; Regole Costituzionali (1.8.2)</div>
+          • <strong>Carica Accessoria di Vicepremier</strong>: 1 o 2 Vicepresidenti del Consiglio tra i ministri più rappresentativi degli alleati (es. Salvini e Tajani), con contrassegno distintivo <code>⭐ Vicepremier</code> in bacheca ministri.<br>
+          • <strong>Quirinale Risolto &amp; Fine Scrutini Infiniti</strong>: gli extraparlamentari (0 seggi) non votano nell'urna ma possono rilasciare endorsement; convergenza d'Aula garantita entro il 5°–6° scrutinio senza blocchi.<br>
+          • <strong>Pop-Up Drammatico Caduta Governo</strong>: allerta a schermo intero con rottura della maggioranza, dimissioni dell'Esecutivo e consultazioni formali al Quirinale.<br>
+          • <strong>Consenso del Leader di Coalizione</strong>: nessun partito IA (es. M5S) può entrare nella tua coalizione senza la tua approvazione vincolante via modal.<br>
+          • <strong>Presidenze Camere nei Governi Tecnici</strong>: Senato vincolato all'Art. 58 Cost. (età &ge; 40 anni), opposizione esclusa e inclusione di figure tecniche prestigiose.<br>
+          <div style="color:#38bdf8; font-weight:800; font-size:11px; text-transform:uppercase; letter-spacing:0.6px; margin:8px 0 3px; padding-top:6px; border-top:1px solid rgba(255,255,255,0.1);">🛠️ Territorio, Bilanciamento &amp; Urne (1.8.2)</div>
+          • <strong>Copertura Territoriale 20/20 Assoluta</strong>: tutti i 25 partiti hanno almeno un esponente reale in ciascuna delle 20 regioni (897 politici complessivi).<br>
+          • <strong>Pluralismo nelle Elezioni Regionali</strong>: presenti tutti i 5 poli (CDX, CSX, M5S, Moderati, Civici) più la visualizzazione immediata del candidato designato dal giocatore.<br>
+          • <strong>Bilanciamento Mobilitazione Referendaria</strong>: impatto proporzionale al consenso elettorale del partito e al carisma del leader.<br>
+          • <strong>Cabina Nazionale Completa</strong>: visualizzazione di tutte le liste della Repubblica e rimozione di diciture ridondanti sul peso del voto.
         </div>
       </div>
 
@@ -1191,10 +1231,10 @@
           <button class="btn btn-m" style="padding:4px 10px; font-size:11px;" onclick="openTutorialModal()">📚 Apri Manuale Completo</button>
         </div>
         <div style="font-size:12.5px; color:var(--muted); line-height:1.5; max-height:215px; overflow-y:auto; padding-right:6px;">
-          1. <strong>Come Scorre il Tempo</strong>: usa la barra <em>Cronometro della Repubblica</em> in alto (`+1 Giorno`, `+7 Giorni`, `+30 Giorni`). Ogni settimana incassi fondi, rigeneri <strong>Capitale Politico (⚡)</strong> e si aggiornano i sondaggi.<br>
+          1. <strong>Flusso Giornaliero del Tempo</strong>: usa la barra <em>Cronometro della Repubblica</em> in alto (`+1 Giorno`, `+7 Giorni`, `+30 Giorni`). Ogni giorno incassi fondi, rigeneri <strong>+3 ⚡ Capitale Politico</strong> e si aggiornano i sondaggi.<br>
           2. <strong>Indicatori Interattivi (KPI)</strong>: clicca su qualsiasi riquadro in alto (<em>Consenso, Forza Corrente, Prestigio, Spread, Stabilità</em>) per leggere una spiegazione dettagliata di cosa significa e come migliorarlo!<br>
-          3. <strong>Programma e 12 Bacini Sociali</strong>: ogni Dossier ha 5 posizioni chiaramente marcate da <em>🚩 Estrema Sinistra</em> a <em>🦅 Estrema Destra</em>. Allineati ai bacini elettorali, ma attenzione a non tradire bruscamente lo Statuto del tuo partito!<br>
-          4. <strong>Carriera, Congressi e Indipendenti</strong>: se sei Capocorrente, rafforza la tua corrente per sfidare il Segretario al Congresso. Se sei Indipendente (tema bianco), accresci il tuo prestigio per diventare Premier Tecnico, Presidente della Repubblica o fondare un partito.<br>
+          3. <strong>Programma e 12 Bacini Sociali</strong>: ogni Dossier ha 5 posizioni chiaramente marcate da <em>🚩 Estrema Sinistra</em> a <em>🦅 Estrema Destra</em>. Allineati ai bacini elettorali senza tradire bruscamente lo Statuto del tuo partito.<br>
+          4. <strong>Quirinale, Regioni, Congressi e Indipendenti</strong>: puoi giocare come Presidente della Repubblica, Governatore Regionale, Segretario, Capocorrente o Indipendente, sfidando i leader ai Congressi o alle Elezioni Regionali.<br>
           5. <strong>Governo, Leggi e Politica Estera</strong>: vinci le elezioni per nominare manualmente i 15 Ministri e i Presidenti di Camera e Senato, approvare DDL, lanciare Referendum Popolari e guidare la diplomazia internazionale.
         </div>
       </div>
@@ -1205,7 +1245,7 @@
         <div class="sec-hdr">
           <span>1. Scelta Personaggio</span>
           <div style="display:flex; gap:5px;">
-            <button class="btn" id="btnCharReal" onclick="setCharMode('preset')">Politico Reale (62)</button>
+            <button class="btn" id="btnCharReal" onclick="setCharMode('preset')">Politico Reale (70)</button>
             <button class="btn" id="btnCharCust" style="background:var(--bg-2);" onclick="setCharMode('custom')">Crea Personaggio</button>
           </div>
         </div>
@@ -1220,7 +1260,7 @@
         <div id="charCustomBox" style="display:none;">
           <div class="fld"><label>Nome e Cognome</label><input type="text" id="inName" value="Marco Valeri" /></div>
           <div class="grid2">
-            <div class="fld"><label>Età</label><input type="number" id="inAge" value="44" min="25" max="82" /></div>
+            <div class="fld"><label>Età</label><input type="number" id="inAge" value="44" min="25" max="88" /></div>
             <div class="fld"><label>Sesso</label><select id="inGender"><option value="M">Uomo</option><option value="F">Donna</option></select></div>
           </div>
           <div class="fld"><label>Regione di Radicamento</label><select id="inRegion"></select></div>
@@ -1228,6 +1268,7 @@
             <select id="inStartRole" onchange="syncCustomRoleUI()">
               <option value="secretary">Segretario Nazionale del Partito scelto</option>
               <option value="member" selected>Dirigente / Capocorrente interno al Partito (Scala con i Congressi)</option>
+              <option value="president">🏛️ Presidente della Repubblica in carica (Quirinale)</option>
               <option value="independent">Libero Cittadino / Indipendente (Tema Bianco Istituzionale)</option>
               <option value="founder">Fondatore di un Nuovo Partito</option>
             </select>
@@ -1248,31 +1289,50 @@
       </div>
 
       <div class="glass">
-        <div class="sec-hdr"><span id="rightSetupTitle">2. I 24 Partiti Politici Italiani (Clicca per selezionare)</span></div>
+        <div class="sec-hdr"><span id="rightSetupTitle">2. I 24 Partiti Politici Italiani (Simboli Ufficiali • Clicca per selezionare)</span></div>
         <div id="realBox"><div class="p-grid" id="setupParties"></div></div>
         <div id="custBox" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid var(--bd);">
-          <div class="sec-hdr"><span>Dati del Nuovo Partito Fondato</span></div>
-          <div class="grid2">
-            <div class="fld"><label>Nome Partito</label><input type="text" id="cName" value="Alleanza Civica Riformista" /></div>
-            <div class="fld"><label>Sigla (max 5)</label><input type="text" id="cShort" value="ACR" maxlength="5" /></div>
-            <div class="fld"><label>Collocazione Ideologica (Inclusi Estremismi)</label>
-              <select id="cArea">
-                <option value="Estrema Sinistra">🚩 Estrema Sinistra / Rivoluzionaria</option>
-                <option value="Sinistra">🌹 Sinistra Radicale / Eco-Socialista</option>
-                <option value="Centro-Sinistra">🌿 Centro-Sinistra Progressista</option>
-                <option value="Movimento">⭐ Movimento Popolare</option>
-                <option value="Centro" selected>⚖️ Centro Liberale Riformista</option>
-                <option value="Centro-Destra">🔵 Centro-Destra Popolare</option>
-                <option value="Destra">🛡️ Destra Conservatrice Sovranista</option>
-                <option value="Estrema Destra">🦅 Estrema Destra Nazionalista</option>
-              </select>
+          <div class="sec-hdr"><span>Dati & Logo Builder del Nuovo Partito</span></div>
+          <div style="display:grid; grid-template-columns:1fr 140px; gap:14px; align-items:start;">
+            <div class="grid2">
+              <div class="fld"><label>Nome Partito</label><input type="text" id="cName" value="Alleanza Civica Riformista" /></div>
+              <div class="fld"><label>Sigla (max 5)</label><input type="text" id="cShort" value="ACR" maxlength="5" oninput="updateSetupLogoPreview()" /></div>
+              <div class="fld"><label>Collocazione Ideologica</label>
+                <select id="cArea">
+                  <option value="Estrema Sinistra">🚩 Estrema Sinistra / Rivoluzionaria</option>
+                  <option value="Sinistra">🌹 Sinistra Radicale / Eco-Socialista</option>
+                  <option value="Centro-Sinistra">🌿 Centro-Sinistra Progressista</option>
+                  <option value="Movimento">⭐ Movimento Popolare</option>
+                  <option value="Centro" selected>⚖️ Centro Liberale Riformista</option>
+                  <option value="Centro-Destra">🔵 Centro-Destra Popolare</option>
+                  <option value="Destra">🛡️ Destra Conservatrice Sovranista</option>
+                  <option value="Estrema Destra">🦅 Estrema Destra Nazionalista</option>
+                </select>
+              </div>
+              <div class="fld"><label>Colore Sfondo Simbolo</label>
+                <select id="cBgColor" onchange="updateSetupLogoPreview()">
+                  <option value="#2563eb">Blu Riformista</option>
+                </select>
+              </div>
+              <div class="fld"><label>Bordo / Ghiera Esterna</label>
+                <select id="cRingStyle" onchange="updateSetupLogoPreview()">
+                  <option value="tricolore">Tricolore Italiano</option>
+                </select>
+              </div>
+              <div class="fld"><label>Striscia / Grafica di Fondo</label>
+                <select id="cBannerStyle" onchange="updateSetupLogoPreview()">
+                  <option value="onda_tricolore">Onda Tricolore</option>
+                </select>
+              </div>
+              <div class="fld" style="grid-column:1/-1;"><label>Simbolo Centrale Vettoriale</label>
+                <select id="cSymbol" onchange="updateSetupLogoPreview()">
+                  <option value="fiamma">Fiamma Tricolore</option>
+                </select>
+              </div>
             </div>
-            <div class="fld"><label>Stile Simbolo Elettorale</label>
-              <select id="cEmblem">
-                <option value="1">Stella & Onde Tricolori</option><option value="2">Sole dell'Avvenire</option>
-                <option value="3">Torcia della Libertà</option><option value="4">Ramoscello d'Ulivo</option>
-                <option value="5">Bussola Riformista</option><option value="6">Ali Tricolori</option>
-              </select>
+            <div style="text-align:center; background:rgba(0,0,0,0.3); border:1px solid var(--bd); border-radius:12px; padding:12px 8px;">
+              <div style="font-size:10px; color:var(--muted); text-transform:uppercase; font-weight:800; margin-bottom:8px;">Anteprima Logo</div>
+              <div id="cSetupLogoPreview" style="display:flex; justify-content:center; align-items:center; min-height:85px;"></div>
             </div>
           </div>
         </div>
@@ -1308,7 +1368,7 @@
       </div>
     </header>
 
-    <!-- BARRA CRONOMETRO DELLA REPUBBLICA FISSA E INTUITIVA (BUG FIX 1) -->
+    <!-- BARRA CRONOMETRO DELLA REPUBBLICA FISSA E INTUITIVA (SIMULAZIONE GIORNALIERA) -->
     <div class="time-command-bar">
       <div class="time-display-group">
         <div class="time-badge-main">
@@ -1319,7 +1379,7 @@
         <span class="turn-counter-pill" id="topIntlPill" style="color:#60a5fa;">🇪🇺 Membro UE • 🛡️ Membro NATO</span>
       </div>
       <div class="time-controls-group">
-        <span class="time-label-hint">⏱️ Scorri il Tempo:</span>
+        <span class="time-label-hint">⏱️ Flusso Giornaliero (+3 ⚡/g):</span>
         <button class="btn-time btn-t1" onclick="nextTurns(1)">▶️ +1 Giorno</button>
         <button class="btn-time btn-t7" onclick="nextTurns(7)">⏩ +7 Giorni (1 Sett.)</button>
         <button class="btn-time btn-t30" onclick="nextTurns(30)">⏭️ +30 Giorni (1 Mese)</button>
@@ -1329,7 +1389,7 @@
     <div id="campRibbon">🗳️ CAMPAGNA ELETTORALE IN CORSO — MANCANO <span id="campDays">45</span> GIORNI ALLE URNE!</div>
     <div id="refRibbon">🗳️ CAMPAGNA REFERENDARIA IN CORSO: <span id="refRibbonTitle">Referendum Popolare</span> — MANCANO <span id="refRibbonDays">30</span> GIORNI AL VOTO! (SÌ stimato: <span id="refRibbonYes">50%</span>)</div>
     <div id="regimeRibbon">🦅 REGIME AUTORITARIO IN VIGORE — STATO D'ECCEZIONE E PIENI POTERI (Rischio Rivolta: <span id="regRevoltTxt">15%</span>)</div>
-    <div class="ticker"><span class="t-tag">DIRETTA ANSA</span><div id="tickerTxt">3 Novembre 2026: Riaprono i lavori a Montecitorio e Palazzo Madama.</div></div>
+    <div class="ticker"><span class="t-tag">DIRETTA ANSA</span><div id="tickerTxt">3 Novembre 2026: Riaprono i lavori a Montecitorio, Palazzo Madama e nelle 20 Giunte Regionali.</div></div>
 
     <div class="war-room">
       <nav class="nav-rail">
@@ -1341,7 +1401,7 @@
         <button class="nav-item" onclick="showTab('tMin',this)">🏛️ <span>Ministri & Pres. Camere</span></button>
         <button class="nav-item" onclick="showTab('tGov',this)">🦅 <span>Governo, Stato & Golpe</span></button>
         <button class="nav-item" onclick="showTab('tForeign',this)">🌍 <span>Esteri, UE & NATO</span></button>
-        <button class="nav-item" onclick="showTab('tMap',this)">🗺️ <span>Mappa ISTAT 20 Regioni</span></button>
+        <button class="nav-item" onclick="showTab('tMap',this)">🗺️ <span>20 Regioni & Governatori</span></button>
         <button class="nav-item" onclick="showTab('tParl',this)">🪑 <span>Emiciclo & Quirinale</span></button>
       </nav>
 
@@ -1351,7 +1411,7 @@
         <div class="sec-hdr" style="margin-top:8px;"><span>🏛️ Colle del Quirinale</span></div>
         <div class="box" style="background:linear-gradient(135deg,rgba(226,185,59,0.14),rgba(18,27,46,0.95)); border-color:var(--gold-bd); margin-bottom:8px;">
           <div style="font-size:12.5px; font-weight:800; color:var(--gold-lt);" id="qName">Sergio Mattarella (85a)</div>
-          <div style="font-size:10.5px; color:var(--muted);" id="qArea">Garantista Costituzionale</div>
+          <div style="font-size:10.5px; color:var(--muted);" id="qArea">Garante della Costituzione</div>
           <div style="display:flex; justify-content:space-between; font-size:10.5px; margin-top:4px; padding-top:4px; border-top:1px solid var(--bd);">
             <span>Scadenza: <strong id="qEnd">02 Feb 2029</strong></span>
             <span>Fiducia: <strong id="qTrust" style="color:#34d399;">78%</strong></span>
@@ -1363,7 +1423,7 @@
 
       <main>
         <div id="tCareer" class="glass"><div class="sec-hdr"><span>👤 Carriera Politica, 3 Correnti Interne, Congressi & Status Indipendente</span></div><div id="cCareer"></div></div>
-        <div id="tComm" class="glass" style="display:none;"><div class="sec-hdr"><span>📡 Piano Comunicazione & 12 Bacini Sociali (Inclusi Estremismi)</span></div><div id="cComm"></div></div>
+        <div id="tComm" class="glass" style="display:none;"><div class="sec-hdr"><span>📡 Piano Comunicazione Giornaliero & 12 Bacini Sociali</span></div><div id="cComm"></div></div>
         <div id="tProg" class="glass" style="display:none;"><div class="sec-hdr"><span>📜 Programma Elettorale (14 Dossier da Estrema Sinistra a Estrema Destra)</span></div><div id="cProg"></div></div>
         <div id="tLaws" class="glass" style="display:none;"><div class="sec-hdr"><span>⚖️ Stato Legale Attuale dei 16 Temi Caldi in Italia, Riforme Parlamentari & Referendum Popolari</span></div><div id="cLaws"></div></div>
         <div id="tCoal" class="glass" style="display:none;"><div class="sec-hdr"><span>🤝 Dossier 24 Partiti, Veti Dinamici, Ammissione Coalizioni & Estinzione Partiti</span></div><div id="cCoal"></div></div>
@@ -1371,8 +1431,8 @@
         <div id="tGov" class="glass" style="display:none;"><div class="sec-hdr"><span>🦅 Gestione Governo, Riforme dell'Ordinamento dello Stato, Golpe & Regime</span></div><div id="cGov"></div></div>
         <div id="tForeign" class="glass" style="display:none;"><div class="sec-hdr"><span>🌍 Politica Estera, Relazioni coi Leader Mondiali, Unione Europea & NATO</span></div><div id="cForeign"></div></div>
         <div id="tMap" class="glass" style="display:none;">
-          <div class="sec-hdr"><span>🗺️ Cartina Geografica Ufficiale delle 20 Regioni Italiane (ISTAT Alta Definizione)</span><span id="mapStatus" style="font-size:11px; color:#34d399;">✅ Cartografia Ufficiale ISTAT Incorporata</span></div>
-          <div class="grid2" style="grid-template-columns:1.15fr 0.85fr;">
+          <div class="sec-hdr"><span>🗺️ Le 20 Regioni Italiane (ISTAT), Governatori in Carica & Elezioni Regionali</span><span id="mapStatus" style="font-size:11px; color:#34d399;">✅ Cartografia Ufficiale ISTAT Incorporata</span></div>
+          <div class="grid2" style="grid-template-columns:1.1fr 0.9fr;">
             <div style="background:radial-gradient(circle at 50% 45%,#0f223d 0%,#060d18 85%); border:1px solid var(--bd); border-radius:11px; padding:8px; text-align:center;">
               <svg id="itMapSvg" viewBox="0 0 520 640" style="width:100%; max-width:420px; height:auto;"></svg>
             </div>
